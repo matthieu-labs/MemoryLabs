@@ -124,7 +124,7 @@ These go into the pitch deck as vision slides — we mention them but do not bui
 
 ## Transcript → Chapter Pipeline (Execution Vision)
 
-*Source: pre-hackathon WhatsApp exchange (Matthieu + Florian, 2026-06-05)*
+*Source: pre-hackathon team discussion, 2026-06-05*
 
 This is the intended implementation approach for the audio-to-chapter pipeline. Follow this when building the backend.
 
@@ -185,4 +185,4 @@ The transcription step must produce **diarized** output (speaker-separated). Eve
 
 ---
 
-*Saved: 2026-06-06 | Source: recorded scope alignment conversation + WhatsApp pre-hackathon discussion, AI Beavers Hackathon Hamburg*
+*Saved: 2026-06-06 | Source: recorded scope alignment conversation + pre-hackathon team discussion, AI Beavers Hackathon Hamburg*
