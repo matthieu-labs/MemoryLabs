@@ -57,6 +57,7 @@ Rationale:
 - **Stop** button
 
 ### Screen 3 — Topic Selection
+- Recording gets transcribed 
 - After stopping: AI shows detected topics from the recording
   - Example: "This conversation covered: school (primary), honeymoon, family relationships"
 - User picks one topic for the first chapter
@@ -68,6 +69,8 @@ Rationale:
 - Moderator can read through with grandfather
 - Basic approval / edit flow
 
+**Screen 5:** 
+First chapter in read only mode 
 ---
 
 ## Voice Fingerprint — v1 vs v2
