@@ -5,6 +5,8 @@ claud_doc_uuid: 637d64aa-2662-4410-a4cc-da0289dc87e3
 # Changelog
 
 ## [Unreleased]
+### Removed
+- API key input fields (ElevenLabs, Qwen) from the start screen. The hosted app uses server-side keys exclusively; localStorage key persistence also removed.
 ### Added
 - Audio/video upload + transcription via ElevenLabs Scribe v2 with speaker diarization; ElevenLabs and Qwen API key fields (stored in localStorage).
 - Real microphone recording (outside debug mode) via `MediaRecorder`, transcribed through ElevenLabs Scribe v2; debug mode keeps the mock transcript.
