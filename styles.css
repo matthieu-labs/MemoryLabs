@@ -916,6 +916,28 @@ input:focus {
   color: var(--sage);
 }
 
+.topic-choice-hint {
+  margin: 0 0 10px;
+  font-size: 0.78rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.topic-choice-hint-error {
+  color: var(--clay-dark);
+  font-weight: 700;
+}
+
+.topic-actions {
+  display: grid;
+  gap: 8px;
+}
+
+.topic-action-secondary {
+  min-height: 40px;
+  font-size: 0.9rem;
+}
+
 .topic-button {
   display: flex;
   align-items: center;

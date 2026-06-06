@@ -78,6 +78,8 @@ let uploadedTranscriptText = null;
 let speakerNames = {};
 // Topics extracted from the current transcript (replaces the old dummy list).
 let detectedTopics = [];
+// Set of topic ids the user has selected (multi-select) for chapter writing.
+let selectedTopics = new Set();
 // Title produced by Qwen alongside the chapter draft, if any.
 let generatedChapterTitle = null;
 
@@ -90,6 +92,9 @@ const el = {
   topicOptions:   document.querySelector("#topicOptions"),
   topicBadge:     document.querySelector("#topicBadge"),
   chapterEditor:  document.querySelector("#chapterEditor"),
+  writeAllButton: document.querySelector("#writeAllButton"),
+  writeSelectedButton: document.querySelector("#writeSelectedButton"),
+  topicChoiceHint: document.querySelector("#topicChoiceHint"),
   finalTitle:     document.querySelector("#finalTitle"),
   finalText:      document.querySelector("#finalText"),
   topicHint:      document.querySelector("#topicHint"),
@@ -440,6 +445,8 @@ function detectTopics(transcript) {
 function refreshDetectedTopics() {
   detectedTopics = detectTopics(activeTranscript);
   selectedTopic = detectedTopics.length ? detectedTopics[0].id : null;
+  // Default: every detected topic is selected; the user can toggle some off.
+  selectedTopics = new Set(detectedTopics.map((t) => t.id));
 }
 
 // Ask Qwen for richer, theme-level topics. Returns normalized topic objects.
@@ -497,6 +504,7 @@ function detectAndRenderTopics() {
       if (topics.length) {
         detectedTopics = topics;
         selectedTopic = topics[0].id;
+        selectedTopics = new Set(topics.map((t) => t.id));
       }
     })
     .catch((error) => console.warn("Qwen topic detection failed, using local topics:", error))
@@ -522,7 +530,7 @@ function renderTopics({ refining = false } = {}) {
   const buttons = detectedTopics
     .map(
       (t) => `
-    <button class="topic-button ${t.id === selectedTopic ? "active" : ""}" type="button" data-topic="${escapeAttr(t.id)}">
+    <button class="topic-button ${selectedTopics.has(t.id) ? "active" : ""}" type="button" data-topic="${escapeAttr(t.id)}" aria-pressed="${selectedTopics.has(t.id)}">
       <span>${escapeHtml(t.label)}</span>
       <small>${escapeHtml(t.confidence)}</small>
     </button>`
@@ -532,17 +540,87 @@ function renderTopics({ refining = false } = {}) {
   el.topicOptions.innerHTML = refiningNote + buttons;
 }
 
-function selectTopic(topicId) {
+function toggleTopic(topicId) {
+  if (selectedTopics.has(topicId)) selectedTopics.delete(topicId);
+  else selectedTopics.add(topicId);
   selectedTopic = topicId;
+  if (el.topicChoiceHint) {
+    el.topicChoiceHint.textContent = "Tap topics to select, then choose what to write:";
+    el.topicChoiceHint.classList.remove("topic-choice-hint-error");
+  }
   renderTopics();
 }
 
 // ─── Chapter ──────────────────────────────────────────────
 
-async function writeChapter() {
-  const topic = currentTopic();
-  el.topicBadge.textContent = topic.label;
+const GHOSTWRITER_SYSTEM_PROMPT = `You are a ghostwriter helping create an autobiography. Your only job is to transform a raw interview transcript into a polished, standalone chapter.
+
+Rules (strict — never break these):
+- NEVER invent facts, emotions, or details not present in the transcript.
+- NEVER add context, explanations, or background knowledge the speaker didn't provide.
+- If the speaker was vague, stay vague. Do not fill gaps.
+- Write ONLY about what the speaker actually described.
+- If the transcript contains multiple distinct memories or topics, output one chapter per topic — each with its own title.
+
+Voice extraction (do this first, silently):
+Before writing, identify from the transcript:
+- The speaker's characteristic adjectives and intensifiers ("absolutely wild", "kind of nuts").
+- Sentence rhythm: do they speak in short bursts or long flowing sentences?
+- Filler patterns that reveal personality ("I mean…", "the thing is…", "honestly").
+- Specific nouns or phrases they repeat (these are load-bearing words — keep them).
+- Emotional register: understated, enthusiastic, dry, self-deprecating?
+
+Output format:
+For each distinct memory or topic in the transcript:
+
+[Chapter Title — derived from the speaker's own words if possible]
+
+[Prose paragraph(s) written in first person, in the speaker's voice, using their vocabulary and rhythm. Past tense. No quotes from the transcript — synthesise it into flowing narrative. 2–5 paragraphs.]`;
+
+// The ghostwriter prompt returns a title line followed by prose (and, for
+// multi-topic transcripts, several such blocks separated by "---"). Pull out
+// the first title for the final-chapter heading and keep the rest as the body.
+function parseGhostwriterOutput(text) {
+  const trimmed = String(text).trim();
+  const lines = trimmed.split(/\r?\n/);
+  let i = 0;
+  while (i < lines.length && !lines[i].trim()) i++;
+
+  if (i < lines.length) {
+    const candidate = lines[i]
+      .trim()
+      .replace(/^#+\s*/, "")
+      .replace(/^\*+|\*+$/g, "")
+      .replace(/^\[|\]$/g, "")
+      .trim();
+    const looksLikeTitle = candidate.length > 0 && candidate.length <= 80 && !/[.?!]$/.test(candidate);
+    if (looksLikeTitle) {
+      const body = lines.slice(i + 1).join("\n").trim();
+      return { title: candidate, body: body || trimmed };
+    }
+  }
+  return { title: null, body: trimmed };
+}
+
+// scope: "all" → one chapter per detected topic; "selected" → only the topics
+// the user has selected. The FULL transcript is always sent as the source of
+// truth so no knowledge is lost, regardless of which topics are written.
+async function writeChapters(scope) {
+  const chosen =
+    scope === "selected"
+      ? detectedTopics.filter((t) => selectedTopics.has(t.id))
+      : detectedTopics.slice();
+
+  if (scope === "selected" && !chosen.length) {
+    el.topicChoiceHint.textContent = "Select at least one topic first.";
+    el.topicChoiceHint.classList.add("topic-choice-hint-error");
+    return;
+  }
+  el.topicChoiceHint.classList.remove("topic-choice-hint-error");
+
   generatedChapterTitle = null;
+  const labels = chosen.map((t) => t.label);
+  el.topicBadge.textContent = labels.length ? labels.join(" · ") : currentTopic().label;
 
   const fallback = uploadedTranscriptText !== null
     ? transcriptText()
@@ -555,34 +633,35 @@ async function writeChapter() {
     return;
   }
 
-  el.chapterEditor.value = "Writing your chapter with Qwen…";
+  // Scope instruction appended to the transcript. Empty for "all" so the
+  // ghostwriter prompt's own per-topic behavior applies.
+  const scopeInstruction =
+    scope === "selected"
+      ? `\n\nWrite chapters ONLY for the following topic(s): ${labels.join(", ")}. ` +
+        `Do not write chapters about any other topics, even if they appear in the transcript.`
+      : `\n\nWrite one chapter for each distinct topic you find in the transcript.`;
+
+  el.chapterEditor.value = "Writing your chapter(s) with Qwen…";
   el.chapterEditor.disabled = true;
   try {
     const content = await qwenChat(
       [
-        {
-          role: "system",
-          content:
-            "You are a skilled memoir ghostwriter. You transform raw interview transcripts into warm, vivid, emotionally engaging first-person memoir chapters that are a pleasure to read. Write from the perspective of the person recounting their memories. Preserve every fact and their authentic voice; never invent events that the transcript does not support. Use flowing prose with no speaker labels and no question-and-answer format. Respond with JSON only.",
-        },
+        { role: "system", content: GHOSTWRITER_SYSTEM_PROMPT },
         {
           role: "user",
           content:
-            `Write a polished, enjoyable memoir chapter focused on the theme "${topic.label}". ` +
-            `Base it strictly on the transcript: smooth out filler words and repetition, organize the memories naturally, and keep it concrete and heartfelt. ` +
-            `Write 3 to 6 short paragraphs, and give it a short, evocative chapter title. ` +
-            `Return JSON exactly like {"title":"...","chapter":"..."}.\n\nTranscript:\n${transcriptText()}`,
+            `The interview transcript follows. The speaker's words are the source of truth.${scopeInstruction}\n\n${transcriptText()}`,
         },
       ],
-      { temperature: 0.8 }
+      { temperature: 0.6 }
     );
 
-    const parsed = parseJsonLoose(content);
-    if (parsed && parsed.chapter) {
-      generatedChapterTitle = parsed.title ? String(parsed.title).trim() : null;
-      el.chapterEditor.value = String(parsed.chapter).trim();
+    if (content.trim()) {
+      const { title, body } = parseGhostwriterOutput(content);
+      generatedChapterTitle = title;
+      el.chapterEditor.value = body;
     } else {
-      el.chapterEditor.value = content.trim() || fallback;
+      el.chapterEditor.value = fallback;
     }
   } catch (error) {
     console.warn("Qwen chapter generation failed, using transcript:", error);
@@ -621,6 +700,7 @@ function resetDemo() {
   timerInterval      = null;
   selectedTopic      = null;
   detectedTopics     = [];
+  selectedTopics     = new Set();
   generatedChapterTitle = null;
   modalSelectedTopic = null;
   wantsQuestions     = false;
@@ -941,7 +1021,8 @@ async function handleAudioUpload(event) {
 
 document.querySelector("#startButton").addEventListener("click",    showModal);
 document.querySelector("#stopButton").addEventListener("click",     stopRecording);
-document.querySelector("#writeButton").addEventListener("click",    writeChapter);
+el.writeAllButton.addEventListener("click",      () => writeChapters("all"));
+el.writeSelectedButton.addEventListener("click", () => writeChapters("selected"));
 document.querySelector("#polishButton").addEventListener("click",   polishChapter);
 document.querySelector("#approveButton").addEventListener("click",  approveChapter);
 document.querySelector("#resetButton").addEventListener("click",    resetDemo);
@@ -1009,7 +1090,7 @@ el.topicModal.addEventListener("click", e => { if (e.target === el.topicModal) h
 
 el.topicOptions.addEventListener("click", e => {
   const btn = e.target.closest("[data-topic]");
-  if (btn) selectTopic(btn.dataset.topic);
+  if (btn) toggleTopic(btn.dataset.topic);
 });
 
 // ─── Init ─────────────────────────────────────────────────

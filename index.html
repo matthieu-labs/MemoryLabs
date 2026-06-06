@@ -220,9 +220,15 @@
                 <span>Detected topics</span>
               </div>
               <div class="topic-options" id="topicOptions"></div>
-              <button class="primary-action slim" id="writeButton" type="button">
-                Write chapter
-              </button>
+              <p class="topic-choice-hint" id="topicChoiceHint">Tap topics to select, then choose what to write:</p>
+              <div class="topic-actions">
+                <button class="primary-action slim" id="writeAllButton" type="button">
+                  Chapter for every topic
+                </button>
+                <button class="ghost-button topic-action-secondary" id="writeSelectedButton" type="button">
+                  Only selected topics
+                </button>
+              </div>
             </aside>
           </div>
         </section>
