@@ -110,11 +110,8 @@ const el = {
   parkingCount:   document.querySelector("#parkingCount"),
   parkingEmpty:   document.querySelector("#parkingEmpty"),
   parkingList:    document.querySelector("#parkingList"),
-  // Nav panels
-  panelChapters:    document.querySelector("#panelChapters"),
-  panelRecordings:  document.querySelector("#panelRecordings"),
-  panelParkingLot:  document.querySelector("#panelParkingLot"),
-  panelSettings:    document.querySelector("#panelSettings"),
+  // Family tree
+  familyTree:       document.querySelector("#familyTree"),
 };
 
 // ─── Helpers ─────────────────────────────────────────────
@@ -167,26 +164,99 @@ function setScreen(stepId) {
 
 // ─── Sidebar nav ─────────────────────────────────────────
 
-const panelMap = {
-  chapters:   el.panelChapters,
-  recordings: el.panelRecordings,
-  parkingLot: el.panelParkingLot,
-  settings:   el.panelSettings,
+// ─── Top tabs / views ────────────────────────────────────
+// Mobile-first: top tabs swap full-screen views. Family is the primary view;
+// "record" hosts the recording flow (the .screen sub-steps inside #recordView).
+
+const viewMap = {
+  family:   document.querySelector("#familyView"),
+  record:   document.querySelector("#recordView"),
+  chapters: document.querySelector("#chaptersView"),
+  parking:  document.querySelector("#parkingView"),
+  settings: document.querySelector("#settingsView"),
 };
 
-function switchSidebarPanel(panelKey) {
-  activeSidebarPanel = panelKey;
-  Object.entries(panelMap).forEach(([key, panel]) => {
-    panel.hidden = key !== panelKey;
+let activeTab = "family";
+
+function switchTab(tabKey) {
+  if (!viewMap[tabKey]) return;
+  activeTab = tabKey;
+  Object.entries(viewMap).forEach(([key, view]) => {
+    view.classList.toggle("active", key === tabKey);
   });
-  document.querySelectorAll(".nav-item").forEach(btn => btn.classList.remove("active"));
-  document.querySelector(`#nav${panelKey.charAt(0).toUpperCase() + panelKey.slice(1)}`).classList.add("active");
+  document.querySelectorAll(".tab").forEach(btn => {
+    btn.classList.toggle("active", btn.dataset.tab === tabKey);
+  });
 }
 
-document.querySelector("#navChapters").addEventListener("click",   () => switchSidebarPanel("chapters"));
-document.querySelector("#navRecordings").addEventListener("click",  () => switchSidebarPanel("recordings"));
-document.querySelector("#navParkingLot").addEventListener("click",  () => switchSidebarPanel("parkingLot"));
-document.querySelector("#navSettings").addEventListener("click",    () => switchSidebarPanel("settings"));
+document.querySelectorAll(".tab").forEach(btn => {
+  btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+});
+
+// ─── Family tree ─────────────────────────────────────────
+
+const familyOwner = { name: "You", meta: "Family collector", recordings: 3 };
+
+// Owner sits at the top; each group hangs below with a connector (matches the
+// ported editorial styling). Elders carry the most recorded stories.
+const familyGroups = [
+  { relation: "Parents", people: [
+    { name: "Hans",   recordings: 5 },
+    { name: "Ingrid", recordings: 3 },
+  ]},
+  { relation: "Grandparents", people: [
+    { name: "Otto",  recordings: 4 },
+    { name: "Helga", recordings: 2 },
+    { name: "Maria", recordings: 1 },
+  ]},
+  { relation: "Siblings", people: [
+    { name: "Lena", recordings: 0 },
+  ]},
+  { relation: "Children", people: [
+    { name: "Mia", recordings: 0 },
+  ]},
+];
+
+function initial(name) {
+  return escapeHtml(String(name).trim().charAt(0).toUpperCase() || "?");
+}
+
+function personChip(person) {
+  const badge = person.recordings > 0
+    ? `<span class="rec-count">${person.recordings}</span>`
+    : `<span class="rec-count is-empty" title="No stories yet">+</span>`;
+  return `
+    <button class="person-chip" type="button" data-person="${escapeAttr(person.name)}">
+      <span class="person-avatar">${initial(person.name)}</span>
+      <span class="person-name">${escapeHtml(person.name)}</span>
+      ${badge}
+    </button>`;
+}
+
+function renderFamilyTree() {
+  const owner = `
+    <div class="owner-card">
+      <span class="owner-avatar">${initial(familyOwner.name)}</span>
+      <span class="owner-name">${escapeHtml(familyOwner.name)}</span>
+      <span class="owner-meta">${escapeHtml(familyOwner.meta)}</span>
+      <span class="owner-count">${familyOwner.recordings} stories</span>
+    </div>`;
+
+  const groups = familyGroups.map(group => `
+    <div class="relation-group">
+      <span class="relation-label">${escapeHtml(group.relation)}</span>
+      <div class="person-row">${group.people.map(personChip).join("")}</div>
+    </div>`
+  ).join("");
+
+  el.familyTree.innerHTML = owner + groups;
+}
+
+el.familyTree.addEventListener("click", e => {
+  const chip = e.target.closest(".person-chip");
+  if (!chip) return;
+  // Prototype: tapping a person would open their stories. Kept inert for now.
+});
 
 // ─── Chapters list ────────────────────────────────────────
 
@@ -1152,7 +1222,7 @@ el.writeAllButton.addEventListener("click",      () => writeChapters("all"));
 el.writeSelectedButton.addEventListener("click", () => writeChapters("selected"));
 document.querySelector("#polishButton").addEventListener("click",   polishChapter);
 document.querySelector("#approveButton").addEventListener("click",  approveChapter);
-document.querySelector("#resetButton").addEventListener("click",    resetDemo);
+document.querySelector("#resetButton").addEventListener("click",    () => { resetDemo(); switchTab("record"); });
 document.querySelector("#backToReviewButton").addEventListener("click", () => setScreen("review"));
 document.querySelector("#parkNoteButton").addEventListener("click", addParkedTopic);
 el.audioUpload.addEventListener("change", handleAudioUpload);
@@ -1225,4 +1295,5 @@ el.topicOptions.addEventListener("click", e => {
 renderTopics();
 renderChaptersList();
 renderParkingList();
+renderFamilyTree();
 setScreen("start");
