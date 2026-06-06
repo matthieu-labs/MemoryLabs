@@ -122,4 +122,67 @@ These go into the pitch deck as vision slides — we mention them but do not bui
 
 ---
 
-*Saved: 2026-06-06 | Source: recorded scope alignment conversation, AI Beavers Hackathon Hamburg*
+## Transcript → Chapter Pipeline (Execution Vision)
+
+*Source: pre-hackathon WhatsApp exchange (Matthieu + Florian, 2026-06-05)*
+
+This is the intended implementation approach for the audio-to-chapter pipeline. Follow this when building the backend.
+
+### Guiding principle
+Keep it as lo-fi as possible end-to-end first. Get something the jury can test on a live link. Optimise from there.
+
+### Step-by-step pipeline
+
+```
+1. RECORD
+   Web frontend microphone (no separate mobile app needed)
+   External mic can be plugged into laptop/phone if available — but optional
+         ↓
+2. TRANSCRIBE
+   Whisper (or equivalent) with speaker diarization
+   Output: timestamped transcript with speaker labels (Interviewer / Subject)
+         ↓
+3. SUMMARISE (hallucination guard)
+   LLM pass over the Subject's turns only
+   Goal: bullet-point summary that:
+   - Preserves key phrases and formulations (not paraphrased away)
+   - Retains non-filler words (characteristic vocabulary)
+   - Strips filler words, repetitions, tangents
+   This intermediate step is how we guide the LLM and limit hallucination —
+   the model is constrained to what was actually said
+         ↓
+4. BUILD MANUSCRIPT STRUCTURE
+   Merge bullet summaries into a structured outline
+   Chapters organised by life stage / life theme (childhood, family, work, etc.)
+   Key formulations and vocabulary carried forward from step 3
+         ↓
+5. WRITE CHAPTER
+   LLM writes full prose from the manuscript outline
+   Written in first person ("Ich-Perspektive")
+   Uses the preserved vocabulary and formulations as anchors
+   Style parameters applied (see below)
+```
+
+### Voice fingerprint / style
+
+Rather than a separate word bank, style is derived from the summary pass and controlled via style parameters:
+
+| Parameter | Example values | Default |
+|-----------|---------------|---------|
+| Descriptiveness | "rich scene descriptions" / "sparse, factual" | medium |
+| Sentence length | "short and punchy" / "long flowing sentences" | derived from transcript |
+| Emotional register | "reserved" / "warm and expressive" | derived from transcript |
+
+- Parameters are set automatically from the transcript on first chapter
+- User (moderator) can adjust them before regenerating
+- Style presets can be offered as shortcuts ("journalistic", "intimate", "formal memoir")
+
+### On the word bank question
+The bullet-point summary approach (step 3) **is** the word bank — it keeps characteristic vocabulary in context without needing a separate data structure. The LLM is then prompted to preserve those formulations when writing prose. Simpler to implement, easier to debug, and less likely to produce unnatural-sounding output.
+
+### What this means for the build order
+The transcription step must produce **diarized** output (speaker-separated). Everything downstream depends on isolating the Subject's voice from the Interviewer's questions. If diarization is unreliable, fall back to: prompt the LLM to identify and extract the Subject's speech from the raw transcript.
+
+---
+
+*Saved: 2026-06-06 | Source: recorded scope alignment conversation + WhatsApp pre-hackathon discussion, AI Beavers Hackathon Hamburg*
