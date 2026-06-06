@@ -43,29 +43,17 @@ const mockTranscript = [
   { speaker: 2, text: "Ah, yes. We had a small bag, too much hope for the weather. That kind of nervous happiness — everything felt new." },
 ];
 
-const chapterDrafts = {
-  school: `The walk to school felt longer in those days, though it could not have been more than twenty minutes. I remember the sound of my shoes on the pavement and the way I tried to arrive with my hair still combed, even when the wind had other plans.
-
-Our classroom had wooden desks with small scratches from generations before us. There was a blue ink bottle near the teacher's table, and somehow that bottle made the whole room feel serious. We were expected to sit straight, listen carefully, and not waste words.
-
-Still, school was not only strictness. It was the place where I learned who could make me laugh without moving their mouth, who would share a pencil, and who was brave enough to ask a question when the rest of us were pretending to understand.`,
-  honeymoon: `The honeymoon train ride is still bright in my mind, not because it was grand, but because everything felt new. We had a small bag, too much hope for the weather, and the kind of nervous happiness that makes even a delay feel like part of the adventure.
-
-I remember looking across the carriage and thinking that life had quietly changed. There was no announcement, no ceremony left by then, only the rhythm of the train and the simple fact that we were traveling together.`,
-  family: `In our family, affection often arrived disguised as teasing. Nobody gave a long speech if a short joke would do. That was how we kept stories alive: someone would mention Uncle Paul and the report cards, and suddenly the whole table knew exactly where the conversation was going.
-
-Those jokes were not cruel. They were little handles on memory, ways to hold on to people and moments that might otherwise slip away.`,
-};
-
-const polishedSuffix =
-  "\n\nModerator note: this draft has been lightly polished in the mock UI while keeping the same warm, concrete voice.";
-
 let currentStep    = "start";
 let selectedTopic  = topics[0].id;
 let modalSelectedTopic = null;
 let wantsQuestions = false;
 let secondsElapsed = 0;
 let timerInterval  = null;
+// Live microphone recording state (used when NOT in debug mode).
+let mediaRecorder  = null;
+let mediaStream    = null;
+let recordedChunks = [];
+let isRealRecording = false;
 let parkedTopics   = [];
 let approvedChapters = [];
 let activeSidebarPanel = "chapters";
@@ -88,10 +76,13 @@ const el = {
   screenLabel:    document.querySelector("#screenLabel"),
   screenTitle:    document.querySelector("#screenTitle"),
   timer:          document.querySelector("#timer"),
+  stopButton:     document.querySelector("#stopButton"),
+  recordingStatus: document.querySelector("#recordingStatus"),
   elapsedBadge:   document.querySelector("#elapsedBadge"),
   topicOptions:   document.querySelector("#topicOptions"),
   topicBadge:     document.querySelector("#topicBadge"),
   chapterEditor:  document.querySelector("#chapterEditor"),
+  polishButton:   document.querySelector("#polishButton"),
   writeAllButton: document.querySelector("#writeAllButton"),
   writeSelectedButton: document.querySelector("#writeSelectedButton"),
   topicChoiceHint: document.querySelector("#topicChoiceHint"),
@@ -286,37 +277,134 @@ function renderModalTopics() {
 
 // ─── Recording ────────────────────────────────────────────
 
-function startRecording() {
-  hideModal();
-
-  if (wantsQuestions && modalSelectedTopic) {
-    selectedTopic = modalSelectedTopic;
-    const topic = topics.find(t => t.id === selectedTopic);
-    el.topicHintLabel.textContent  = topic.label;
-    el.topicHintQuestions.innerHTML = (topicQuestions[selectedTopic] || [])
-      .map(q => `<li>${q}</li>`).join("");
-    el.topicHint.hidden = false;
-  } else {
-    el.topicHint.hidden = true;
-  }
-
+function startTimer() {
   secondsElapsed = 0;
   el.timer.textContent = formatTime(0);
   timerInterval = window.setInterval(() => {
     secondsElapsed += 1;
     el.timer.textContent = formatTime(secondsElapsed);
   }, 1000);
+}
+
+function stopTimer() {
+  window.clearInterval(timerInterval);
+  timerInterval = null;
+}
+
+function showTopicHint() {
+  if (wantsQuestions && modalSelectedTopic) {
+    selectedTopic = modalSelectedTopic;
+    const topic = topics.find((t) => t.id === selectedTopic);
+    el.topicHintLabel.textContent = topic.label;
+    el.topicHintQuestions.innerHTML = (topicQuestions[selectedTopic] || [])
+      .map((q) => `<li>${q}</li>`)
+      .join("");
+    el.topicHint.hidden = false;
+  } else {
+    el.topicHint.hidden = true;
+  }
+}
+
+async function startRecording() {
+  hideModal();
+  showTopicHint();
+  el.recordingStatus.hidden = true;
+  el.recordingStatus.classList.remove("upload-status-error");
+  el.stopButton.disabled = false;
+
+  // Debug mode: no microphone, no API — fall back to the mock transcript.
+  if (el.debugMode.checked) {
+    isRealRecording = false;
+    startTimer();
+    setScreen("recording");
+    return;
+  }
+
+  // Real recording needs an ElevenLabs key for transcription.
+  if (!getApiKey()) {
+    setUploadStatus("Enter your ElevenLabs API key before recording (or enable Debug mode).", true);
+    el.apiKey.focus();
+    return;
+  }
+
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (error) {
+    setUploadStatus(`Microphone access failed: ${error.message}`, true);
+    return;
+  }
+
+  recordedChunks = [];
+  mediaRecorder = new MediaRecorder(mediaStream);
+  mediaRecorder.ondataavailable = (event) => {
+    if (event.data && event.data.size) recordedChunks.push(event.data);
+  };
+  mediaRecorder.onstop = handleRecordingStopped;
+  mediaRecorder.start();
+  isRealRecording = true;
+  startTimer();
   setScreen("recording");
 }
 
 function stopRecording() {
-  window.clearInterval(timerInterval);
-  timerInterval = null;
-  if (secondsElapsed < 12) secondsElapsed = 12;
-  el.elapsedBadge.textContent = formatTime(secondsElapsed);
-  renderTranscript();
-  detectAndRenderTopics();
-  setScreen("topics");
+  stopTimer();
+
+  // Debug / mock path.
+  if (!isRealRecording) {
+    if (secondsElapsed < 12) secondsElapsed = 12;
+    el.elapsedBadge.textContent = formatTime(secondsElapsed);
+    activeTranscript = mockTranscript;
+    uploadedTranscriptText = mockTranscript.map((l) => l.text).join("\n\n");
+    speakerNames = {};
+    renderTranscript();
+    detectAndRenderTopics();
+    setScreen("topics");
+    return;
+  }
+
+  // Real path: stop the recorder; transcription happens in onstop.
+  el.stopButton.disabled = true;
+  el.recordingStatus.hidden = false;
+  el.recordingStatus.classList.remove("upload-status-error");
+  el.recordingStatus.textContent = "Transcribing your recording with Scribe v2…";
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+  }
+}
+
+async function handleRecordingStopped() {
+  if (mediaStream) {
+    mediaStream.getTracks().forEach((track) => track.stop());
+    mediaStream = null;
+  }
+
+  const mimeType = (mediaRecorder && mediaRecorder.mimeType) || "audio/webm";
+  const blob = new Blob(recordedChunks, { type: mimeType });
+  recordedChunks = [];
+  isRealRecording = false;
+
+  if (!blob.size) {
+    el.recordingStatus.classList.add("upload-status-error");
+    el.recordingStatus.textContent = "Nothing was recorded. Press the record button to try again.";
+    return;
+  }
+
+  const ext = mimeType.includes("mp4") || mimeType.includes("mpeg") ? "mp4" : "webm";
+  const file = new File([blob], `recording.${ext}`, { type: mimeType });
+
+  try {
+    const data = await transcribeAudioFile(file, getApiKey());
+    if (applyDiarizedResult(data)) {
+      setScreen("topics");
+    } else {
+      el.recordingStatus.classList.add("upload-status-error");
+      el.recordingStatus.textContent = "No speech detected. Press record to try again.";
+    }
+  } catch (error) {
+    console.error(error);
+    el.recordingStatus.classList.add("upload-status-error");
+    el.recordingStatus.textContent = `Transcription failed: ${error.message}. Use Reset demo to start over.`;
+  }
 }
 
 // ─── Transcript ───────────────────────────────────────────
@@ -622,9 +710,7 @@ async function writeChapters(scope) {
   const labels = chosen.map((t) => t.label);
   el.topicBadge.textContent = labels.length ? labels.join(" · ") : currentTopic().label;
 
-  const fallback = uploadedTranscriptText !== null
-    ? transcriptText()
-    : chapterDrafts[selectedTopic] || transcriptText();
+  const fallback = transcriptText();
 
   setScreen("review");
 
@@ -671,9 +757,37 @@ async function writeChapters(scope) {
   }
 }
 
-function polishChapter() {
-  if (!el.chapterEditor.value.includes(polishedSuffix.trim())) {
-    el.chapterEditor.value += polishedSuffix;
+async function polishChapter() {
+  const text = el.chapterEditor.value.trim();
+  if (!text) return;
+
+  if (!getQwenKey()) {
+    setUploadStatus("Add a Qwen API key to polish the chapter.", true);
+    return;
+  }
+
+  const original = el.chapterEditor.value;
+  el.polishButton.disabled = true;
+  el.chapterEditor.disabled = true;
+  try {
+    const content = await qwenChat(
+      [
+        {
+          role: "system",
+          content:
+            "You are a careful copy editor for a memoir. Improve the flow, clarity, and rhythm of the chapter the user provides WITHOUT adding new facts, events, or details, and without removing any. Keep the first-person voice and the original meaning. Return only the revised chapter text, no commentary.",
+        },
+        { role: "user", content: text },
+      ],
+      { temperature: 0.4 }
+    );
+    if (content.trim()) el.chapterEditor.value = content.trim();
+  } catch (error) {
+    console.warn("Polish failed:", error);
+    el.chapterEditor.value = original;
+  } finally {
+    el.polishButton.disabled = false;
+    el.chapterEditor.disabled = false;
   }
 }
 
@@ -698,6 +812,11 @@ function approveChapter() {
 function resetDemo() {
   window.clearInterval(timerInterval);
   timerInterval      = null;
+  if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+  if (mediaStream) { mediaStream.getTracks().forEach((t) => t.stop()); mediaStream = null; }
+  mediaRecorder      = null;
+  recordedChunks     = [];
+  isRealRecording    = false;
   selectedTopic      = null;
   detectedTopics     = [];
   selectedTopics     = new Set();
@@ -717,6 +836,8 @@ function resetDemo() {
   el.topicHint.hidden = true;
   if (el.audioUpload) el.audioUpload.value = "";
   if (el.uploadStatus) { el.uploadStatus.hidden = true; el.uploadStatus.textContent = ""; }
+  if (el.recordingStatus) { el.recordingStatus.hidden = true; el.recordingStatus.textContent = ""; el.recordingStatus.classList.remove("upload-status-error"); }
+  if (el.stopButton) el.stopButton.disabled = false;
 
   renderChaptersList();
   renderParkingList();
@@ -835,6 +956,24 @@ async function transcribeAudioFile(file, apiKey) {
   }
 
   return response.json();
+}
+
+// Apply an ElevenLabs diarized result to app state and render. Returns false
+// if no speech was found. Shared by file upload and live recording.
+function applyDiarizedResult(data) {
+  const lines = buildDiarizedTranscript(data);
+  if (!lines.length) return false;
+
+  uploadedTranscriptText = (data.text || lines.map((l) => l.text).join("\n\n")).trim();
+  activeTranscript = lines;
+  speakerNames = {};
+
+  const speakerCount = new Set(lines.map((l) => l.speaker)).size;
+  el.elapsedBadge.textContent = `${speakerCount} speaker${speakerCount > 1 ? "s" : ""}`;
+
+  renderTranscript();
+  detectAndRenderTopics();
+  return true;
 }
 
 // Collapse the per-word diarized response into speaker-labeled turns.
@@ -991,24 +1130,12 @@ async function handleAudioUpload(event) {
   setUploadStatus(`Transcribing "${file.name}" with Scribe v2…`);
   try {
     const data = await transcribeAudioFile(file, apiKey);
-    const lines = buildDiarizedTranscript(data);
-
-    if (!lines.length) {
+    if (applyDiarizedResult(data)) {
+      setUploadStatus(`Done — ${activeTranscript.length} segments.`);
+      setScreen("topics");
+    } else {
       setUploadStatus("No speech detected in that file.", true);
-      return;
     }
-
-    uploadedTranscriptText = (data.text || lines.map((l) => l.text).join("\n\n")).trim();
-    activeTranscript = lines;
-    speakerNames = {};
-
-    const speakerCount = new Set(lines.map((l) => l.speaker)).size;
-    el.elapsedBadge.textContent = `${speakerCount} speaker${speakerCount > 1 ? "s" : ""}`;
-    setUploadStatus(`Done — ${lines.length} segments, ${speakerCount} speaker${speakerCount > 1 ? "s" : ""}.`);
-
-    renderTranscript();
-    detectAndRenderTopics();
-    setScreen("topics");
   } catch (error) {
     console.error(error);
     setUploadStatus(`Transcription failed: ${error.message}`, true);

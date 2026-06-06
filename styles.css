@@ -645,6 +645,19 @@ input:focus {
   color: var(--clay-dark);
 }
 
+.recording-status {
+  margin: 12px 0 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--sage-dark);
+  text-align: center;
+}
+
+.stop-button:disabled {
+  opacity: 0.5;
+  cursor: progress;
+}
+
 .question-details {
   max-width: 380px;
   width: 100%;
