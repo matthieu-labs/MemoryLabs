@@ -211,6 +211,45 @@ p { line-height: 1.6; }
   line-height: 1.35;
 }
 
+/* Recordings in sidebar */
+.recordings-list {
+  display: grid;
+  gap: 3px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recording-open {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.recording-open:hover {
+  background: rgba(255, 253, 248, 0.08);
+}
+
+.recording-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: rgba(255, 253, 248, 0.82);
+  line-height: 1.35;
+}
+
+.recording-date {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: rgba(255, 253, 248, 0.45);
+}
+
 /* Parking lot in sidebar */
 .parking-list {
   display: grid;
@@ -923,10 +962,34 @@ input:focus {
 }
 
 .topic-refining {
-  margin: 0 0 4px;
-  font-size: 0.76rem;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0;
+  padding: 14px 4px;
+  font-size: 0.82rem;
   font-weight: 700;
   color: var(--sage);
+}
+
+.topic-refining-spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(74, 103, 85, 0.25);
+  border-top-color: var(--sage);
+  border-radius: 50%;
+  flex-shrink: 0;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.primary-action:disabled,
+.ghost-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .topic-choice-hint {

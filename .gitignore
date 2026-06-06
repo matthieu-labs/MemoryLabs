@@ -7,3 +7,6 @@ __MACOSX/
 Thumbs.db
 *.log
 node_modules/
+
+# Local secrets / config
+config.js

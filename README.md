@@ -20,7 +20,15 @@ Static, frontend-only demo for the v1 MemoryLabs / Memoir AI scope.
 
 ## Run
 
-Open `index.html` in a browser.
+1. Copy `config.example.js` to `config.js` and paste your Supabase **Project URL** and **anon public key** (Supabase → Settings → API).
+2. In the Supabase SQL editor, run `supabase-schema.sql` once to create the tables.
+3. Open `index.html` in a browser.
+
+`config.js` is gitignored. The anon key is safe to ship to the browser — data is protected by Row Level Security, not by hiding the key. AI keys (ElevenLabs / Qwen) are still entered in the UI and saved in `localStorage`.
+
+## Persistence (Supabase)
+
+Recordings/transcripts, approved chapters, and parking-lot topics are stored in Supabase and reloaded on startup. Tables: `recordings`, `chapters`, `parked_topics` (see `supabase-schema.sql`). If `config.js` is missing or unfilled, the app still runs but nothing persists (a console warning is logged).
 
 ## Scope Source
 

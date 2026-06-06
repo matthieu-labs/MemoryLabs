@@ -64,7 +64,8 @@
 
           <!-- Recordings panel -->
           <div class="sidebar-panel" id="panelRecordings" hidden>
-            <p class="panel-empty">Recordings will appear here after each session.</p>
+            <p class="panel-empty" id="recordingsEmpty">Recordings will appear here after each session.</p>
+            <ul class="recordings-list" id="recordingsList" hidden></ul>
           </div>
 
           <!-- Parking lot panel -->
@@ -318,6 +319,8 @@
       </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./config.js"></script>
     <script src="./script.js"></script>
   </body>
 </html>

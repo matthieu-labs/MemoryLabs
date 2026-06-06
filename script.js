@@ -56,6 +56,7 @@ let recordedChunks = [];
 let isRealRecording = false;
 let parkedTopics   = [];
 let approvedChapters = [];
+let storedRecordings = [];
 let activeSidebarPanel = "chapters";
 
 // Transcript source: mock conversation by default, or the diarized lines from
@@ -110,6 +111,9 @@ const el = {
   parkingCount:   document.querySelector("#parkingCount"),
   parkingEmpty:   document.querySelector("#parkingEmpty"),
   parkingList:    document.querySelector("#parkingList"),
+  recordingsEmpty: document.querySelector("#recordingsEmpty"),
+  recordingsList:  document.querySelector("#recordingsList"),
+  projectName:    document.querySelector("#projectName"),
   // Nav panels
   panelChapters:    document.querySelector("#panelChapters"),
   panelRecordings:  document.querySelector("#panelRecordings"),
@@ -129,6 +133,116 @@ function escapeHtml(value) {
 
 function escapeAttr(value) {
   return String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+// ─── Supabase persistence ─────────────────────────────────
+// Data (recordings, chapters, parked topics) is stored in Supabase. The URL +
+// anon key come from config.js (window.MEMOIR_CONFIG). The anon key is meant to
+// be public; protect data with Row Level Security (see supabase-schema.sql).
+
+const SUPABASE = (() => {
+  const cfg = window.MEMOIR_CONFIG;
+  if (!window.supabase || !cfg || !cfg.SUPABASE_URL || cfg.SUPABASE_URL.includes("YOUR-PROJECT")) {
+    console.warn("Supabase not configured — data will not persist. Fill in config.js.");
+    return null;
+  }
+  try {
+    return window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  } catch (error) {
+    console.warn("Supabase init failed:", error);
+    return null;
+  }
+})();
+
+function currentProject() {
+  return (el.projectName && el.projectName.value.trim()) || "Untitled project";
+}
+
+async function dbSaveChapter(title, text) {
+  if (!SUPABASE) return;
+  const { error } = await SUPABASE.from("chapters").insert({
+    project: currentProject(),
+    title,
+    body: text,
+  });
+  if (error) console.warn("Supabase: save chapter failed", error.message);
+}
+
+async function dbSaveParkedTopic(text) {
+  if (!SUPABASE) return;
+  const { error } = await SUPABASE.from("parked_topics").insert({
+    project: currentProject(),
+    text,
+  });
+  if (error) console.warn("Supabase: save parked topic failed", error.message);
+}
+
+async function dbSaveRecording(title) {
+  if (!SUPABASE) return;
+  const { data, error } = await SUPABASE.from("recordings")
+    .insert({
+      project: currentProject(),
+      title: title || `Recording — ${new Date().toLocaleString()}`,
+      full_text: uploadedTranscriptText || transcriptText(),
+      segments: activeTranscript,
+      speaker_names: speakerNames,
+    })
+    .select()
+    .single();
+  if (error) {
+    console.warn("Supabase: save recording failed", error.message);
+    return;
+  }
+  if (data) {
+    storedRecordings.unshift(data);
+    renderRecordings();
+  }
+}
+
+async function dbLoadAll() {
+  if (!SUPABASE) return;
+  const [chapters, parked, recordings] = await Promise.all([
+    SUPABASE.from("chapters").select("*").order("created_at", { ascending: true }),
+    SUPABASE.from("parked_topics").select("*").order("created_at", { ascending: true }),
+    SUPABASE.from("recordings").select("*").order("created_at", { ascending: false }).limit(50),
+  ]);
+
+  if (!chapters.error && chapters.data) {
+    approvedChapters = chapters.data.map((r) => ({ title: r.title, text: r.body }));
+    renderChaptersList();
+  }
+  if (!parked.error && parked.data) {
+    parkedTopics = parked.data.map((r) => r.text);
+    renderParkingList();
+  }
+  if (!recordings.error && recordings.data) {
+    storedRecordings = recordings.data;
+    renderRecordings();
+  }
+}
+
+function renderRecordings() {
+  if (!el.recordingsList) return;
+  const count = storedRecordings.length;
+
+  if (count === 0) {
+    el.recordingsEmpty.hidden = false;
+    el.recordingsList.hidden = true;
+    return;
+  }
+  el.recordingsEmpty.hidden = true;
+  el.recordingsList.hidden = false;
+  el.recordingsList.innerHTML = storedRecordings
+    .map(
+      (r, i) => `
+    <li>
+      <button class="recording-open" type="button" data-rec="${i}">
+        <span class="recording-title">${escapeHtml(r.title || "Recording")}</span>
+        <span class="recording-date">${r.created_at ? new Date(r.created_at).toLocaleString() : ""}</span>
+      </button>
+    </li>`
+    )
+    .join("");
 }
 
 function speakerName(index) {
@@ -246,6 +360,7 @@ function addParkedTopic() {
   const text = el.noteInput.value.trim();
   if (!text) return;
   parkedTopics.push(text);
+  dbSaveParkedTopic(text);
   el.noteInput.value = "";
   renderParkingList();
 }
@@ -579,13 +694,23 @@ async function detectTopicsWithQwen() {
     });
 }
 
-// Render local topics immediately, then upgrade with Qwen if a key is present.
+function setTopicActionsEnabled(enabled) {
+  if (el.writeAllButton) el.writeAllButton.disabled = !enabled;
+  if (el.writeSelectedButton) el.writeSelectedButton.disabled = !enabled;
+  if (el.topicChoiceHint) el.topicChoiceHint.hidden = !enabled;
+}
+
+// Compute local topics as a fallback, then refine with Qwen if a key is set.
+// While Qwen works, we only show a loading state (no preliminary topics) and
+// keep the write actions disabled so the user waits for the real result.
 function detectAndRenderTopics() {
   refreshDetectedTopics();
   if (!getQwenKey()) {
+    setTopicActionsEnabled(true);
     renderTopics();
     return;
   }
+  setTopicActionsEnabled(false);
   renderTopics({ refining: true });
   detectTopicsWithQwen()
     .then((topics) => {
@@ -596,7 +721,10 @@ function detectAndRenderTopics() {
       }
     })
     .catch((error) => console.warn("Qwen topic detection failed, using local topics:", error))
-    .finally(() => renderTopics());
+    .finally(() => {
+      setTopicActionsEnabled(true);
+      renderTopics();
+    });
 }
 
 function currentTopic() {
@@ -607,15 +735,23 @@ function currentTopic() {
 }
 
 function renderTopics({ refining = false } = {}) {
-  const refiningNote = refining ? `<p class="topic-refining">Refining topics with Qwen…</p>` : "";
-
-  if (!detectedTopics.length) {
-    el.topicOptions.innerHTML =
-      refiningNote || `<p class="topic-empty">No clear topics detected — you can still write a chapter.</p>`;
+  // While refining, show only the loading state — hold back the preliminary
+  // local topics so the user doesn't see (and act on) throwaway guesses.
+  if (refining) {
+    el.topicOptions.innerHTML = `
+      <div class="topic-refining">
+        <span class="topic-refining-spinner" aria-hidden="true"></span>
+        Refining topics…
+      </div>`;
     return;
   }
 
-  const buttons = detectedTopics
+  if (!detectedTopics.length) {
+    el.topicOptions.innerHTML = `<p class="topic-empty">No clear topics detected — you can still write a chapter.</p>`;
+    return;
+  }
+
+  el.topicOptions.innerHTML = detectedTopics
     .map(
       (t) => `
     <button class="topic-button ${selectedTopics.has(t.id) ? "active" : ""}" type="button" data-topic="${escapeAttr(t.id)}" aria-pressed="${selectedTopics.has(t.id)}">
@@ -624,8 +760,6 @@ function renderTopics({ refining = false } = {}) {
     </button>`
     )
     .join("");
-
-  el.topicOptions.innerHTML = refiningNote + buttons;
 }
 
 function toggleTopic(topicId) {
@@ -802,6 +936,7 @@ function approveChapter() {
   el.finalText.textContent  = text;
 
   approvedChapters.push({ title, text });
+  dbSaveChapter(title, text);
   renderChaptersList();
   switchSidebarPanel("chapters");
   setScreen("final");
@@ -845,6 +980,9 @@ function resetDemo() {
   hideModal();
   switchSidebarPanel("chapters");
   setScreen("start");
+
+  // Restore persisted chapters / parking / recordings from Supabase.
+  dbLoadAll();
 }
 
 // ─── API config + helpers ─────────────────────────────────
@@ -973,6 +1111,7 @@ function applyDiarizedResult(data) {
 
   renderTranscript();
   detectAndRenderTopics();
+  dbSaveRecording();
   return true;
 }
 
@@ -1220,9 +1359,28 @@ el.topicOptions.addEventListener("click", e => {
   if (btn) toggleTopic(btn.dataset.topic);
 });
 
+// Open a stored recording back into the transcript/topics view.
+if (el.recordingsList) {
+  el.recordingsList.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-rec]");
+    if (!btn) return;
+    const rec = storedRecordings[Number(btn.dataset.rec)];
+    if (!rec) return;
+    activeTranscript = Array.isArray(rec.segments) ? rec.segments : [];
+    speakerNames = rec.speaker_names || {};
+    uploadedTranscriptText = rec.full_text || null;
+    if (!activeTranscript.length) return;
+    renderTranscript();
+    detectAndRenderTopics();
+    setScreen("topics");
+  });
+}
+
 // ─── Init ─────────────────────────────────────────────────
 
 renderTopics();
 renderChaptersList();
 renderParkingList();
+renderRecordings();
+dbLoadAll();
 setScreen("start");
