@@ -54,6 +54,8 @@ let mediaRecorder  = null;
 let mediaStream    = null;
 let recordedChunks = [];
 let isRealRecording = false;
+let isPaused = false;
+let recordingPerson = null;   // person a recording is being made for (or null)
 let parkedTopics   = [];
 let approvedChapters = [];
 let storedRecordings = [];
@@ -117,6 +119,13 @@ const el = {
   storageStatus:  document.querySelector("#storageStatus"),
   // Family tree
   familyTree:       document.querySelector("#familyTree"),
+  // Recording controls
+  pauseButton:      document.querySelector("#pauseButton"),
+  cancelButton:     document.querySelector("#cancelButton"),
+  fab:              document.querySelector("#fab"),
+  recordingWith:        document.querySelector("#recordingWith"),
+  recordingWithName:    document.querySelector("#recordingWithName"),
+  recordingWithAvatar:  document.querySelector("#recordingWithAvatar"),
 };
 
 // ─── Helpers ─────────────────────────────────────────────
@@ -317,6 +326,8 @@ function setScreen(stepId) {
   if (el.screenLabel && el.screenTitle) {
     [el.screenLabel.textContent, el.screenTitle.textContent] = screenMeta[stepId];
   }
+  // Hide the "new recording" FAB while a recording is in progress.
+  if (el.fab) el.fab.hidden = stepId === "recording";
   renderSteps();
 }
 
@@ -346,34 +357,86 @@ function switchTab(tabKey) {
   document.querySelectorAll(".tab").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.tab === tabKey);
   });
+  if (tabKey === "family") requestAnimationFrame(centerOwner);
 }
 
 document.querySelectorAll(".tab").forEach(btn => {
   btn.addEventListener("click", () => switchTab(btn.dataset.tab));
 });
 
-// Floating record button → jump straight into a new recording (flow + modal).
+// Floating record button → start recording immediately: no modal, no setup
+// screen — straight to the live recording timer. (Mock transcript on stop; the
+// Start-screen record button still runs the full real ElevenLabs flow.)
 document.querySelector("#fab").addEventListener("click", () => {
+  // If we're on a person's filtered Record list, this recording is for them.
+  recordingPerson = (activeTab === "records" && recordsFilterPerson) ? recordsFilterPerson : null;
   switchTab("record");
-  showModal();
+  wantsQuestions = false;
+  modalSelectedTopic = null;
+  hideModal();
+  showTopicHint();
+  updateRecordingWith();
+  el.recordingStatus.hidden = true;
+  el.recordingStatus.classList.remove("upload-status-error");
+  el.stopButton.disabled = false;
+  isRealRecording = false;
+  startTimer();
+  setScreen("recording");
 });
+
+// Show/hide the "Recording with <person>" banner.
+function updateRecordingWith() {
+  if (!el.recordingWith) return;
+  if (recordingPerson) {
+    el.recordingWith.hidden = false;
+    el.recordingWithName.textContent = recordingPerson;
+    el.recordingWithAvatar.textContent = initial(recordingPerson);
+  } else {
+    el.recordingWith.hidden = true;
+  }
+}
+
+// Cancel a recording in progress without processing it.
+function cancelRecording() {
+  stopTimer();
+  if (isRealRecording && mediaRecorder) {
+    mediaRecorder.onstop = null;       // skip transcription/processing
+    try { mediaRecorder.stop(); } catch { /* ignore */ }
+  }
+  if (mediaStream) {
+    mediaStream.getTracks().forEach(t => t.stop());
+    mediaStream = null;
+  }
+  isRealRecording = false;
+  isPaused = false;
+  const wasFor = recordingPerson;
+  recordingPerson = null;
+  updateRecordingWith();
+  setScreen("start");
+  switchTab(wasFor ? "records" : "family");
+}
+
+if (el.cancelButton) el.cancelButton.addEventListener("click", cancelRecording);
 
 // ─── Family tree ─────────────────────────────────────────
 
 const familyOwner = { name: "You", meta: "Family collector", recordings: 3 };
 
-// Owner sits at the top; each group hangs below with a connector (matches the
-// ported editorial styling). Elders carry the most recorded stories.
-const familyGroups = [
-  { relation: "Parents", people: [
-    { name: "Hans",   recordings: 5 },
-    { name: "Ingrid", recordings: 3 },
-  ]},
+// Genealogical layout: "You" sits in the middle. Ancestors stack ABOVE
+// (top → bottom = oldest → nearest), descendants stack BELOW. The view scrolls
+// vertically and centres on the owner.
+const familyAncestors = [
   { relation: "Grandparents", people: [
     { name: "Otto",  recordings: 4 },
     { name: "Helga", recordings: 2 },
     { name: "Maria", recordings: 1 },
   ]},
+  { relation: "Parents", people: [
+    { name: "Hans",   recordings: 5 },
+    { name: "Ingrid", recordings: 3 },
+  ]},
+];
+const familyDescendants = [
   { relation: "Siblings", people: [
     { name: "Lena", recordings: 0 },
   ]},
@@ -381,6 +444,8 @@ const familyGroups = [
     { name: "Mia", recordings: 0 },
   ]},
 ];
+// Combined list for data iteration (recordings, people lookup).
+const familyGroups = [...familyAncestors, ...familyDescendants];
 
 function initial(name) {
   return escapeHtml(String(name).trim().charAt(0).toUpperCase() || "?");
@@ -398,6 +463,14 @@ function personChip(person) {
     </button>`;
 }
 
+function relationGroupHtml(group) {
+  return `
+    <div class="relation-group">
+      <span class="relation-label">${escapeHtml(group.relation)}</span>
+      <div class="person-row">${group.people.map(personChip).join("")}</div>
+    </div>`;
+}
+
 function renderFamilyTree() {
   const owner = `
     <div class="owner-card" data-person="${escapeAttr(familyOwner.name)}" role="button" tabindex="0">
@@ -407,14 +480,18 @@ function renderFamilyTree() {
       <span class="owner-count">${familyOwner.recordings} stories</span>
     </div>`;
 
-  const groups = familyGroups.map(group => `
-    <div class="relation-group">
-      <span class="relation-label">${escapeHtml(group.relation)}</span>
-      <div class="person-row">${group.people.map(personChip).join("")}</div>
-    </div>`
-  ).join("");
+  el.familyTree.innerHTML =
+    familyAncestors.map(relationGroupHtml).join("") +
+    owner +
+    familyDescendants.map(relationGroupHtml).join("");
 
-  el.familyTree.innerHTML = owner + groups;
+  // Centre the owner once laid out (ancestors above, descendants below).
+  requestAnimationFrame(centerOwner);
+}
+
+function centerOwner() {
+  const owner = el.familyTree && el.familyTree.querySelector(".owner-card");
+  if (owner && owner.scrollIntoView) owner.scrollIntoView({ block: "center" });
 }
 
 // Tapping a person (chip or owner card) opens the Record tab filtered to that
@@ -622,18 +699,58 @@ function renderModalTopics() {
 
 // ─── Recording ────────────────────────────────────────────
 
-function startTimer() {
-  secondsElapsed = 0;
-  el.timer.textContent = formatTime(0);
+function tick() {
   timerInterval = window.setInterval(() => {
     secondsElapsed += 1;
     el.timer.textContent = formatTime(secondsElapsed);
   }, 1000);
 }
 
+function startTimer() {
+  secondsElapsed = 0;
+  el.timer.textContent = formatTime(0);
+  resetPauseUI();
+  tick();
+}
+
+function resumeTimer() {
+  tick();
+}
+
 function stopTimer() {
   window.clearInterval(timerInterval);
   timerInterval = null;
+}
+
+// ─── Pause / resume ───────────────────────────────────────
+
+function recordingPulse() {
+  return document.querySelector("#recordingScreen .pulse");
+}
+
+function resetPauseUI() {
+  isPaused = false;
+  if (el.pauseButton) el.pauseButton.textContent = "Pause";
+  const pulse = recordingPulse();
+  if (pulse) pulse.classList.remove("paused");
+}
+
+function setPaused(paused) {
+  isPaused = paused;
+  if (paused) {
+    stopTimer();
+    if (isRealRecording && mediaRecorder && mediaRecorder.state === "recording") mediaRecorder.pause();
+  } else {
+    resumeTimer();
+    if (isRealRecording && mediaRecorder && mediaRecorder.state === "paused") mediaRecorder.resume();
+  }
+  if (el.pauseButton) el.pauseButton.textContent = paused ? "Resume" : "Pause";
+  const pulse = recordingPulse();
+  if (pulse) pulse.classList.toggle("paused", paused);
+}
+
+if (el.pauseButton) {
+  el.pauseButton.addEventListener("click", () => setPaused(!isPaused));
 }
 
 function showTopicHint() {
@@ -653,6 +770,8 @@ function showTopicHint() {
 async function startRecording() {
   hideModal();
   showTopicHint();
+  recordingPerson = null;
+  updateRecordingWith();
   el.recordingStatus.hidden = true;
   el.recordingStatus.classList.remove("upload-status-error");
   el.stopButton.disabled = false;

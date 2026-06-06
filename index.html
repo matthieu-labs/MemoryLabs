@@ -12,26 +12,27 @@
   <body>
     <main class="app">
 
-      <!-- App bar -->
-      <header class="appbar">
-        <span class="brand">
-          <img src="./logo.png" alt="MemoryLabs" />
-        </span>
-        <span class="mock-badge">Mocked v1</span>
-      </header>
+      <!-- Fixed header: app bar + tabs -->
+      <div class="topbar">
+        <header class="appbar">
+          <span class="brand">
+            <img src="./logo.png" alt="MemoryLabs" />
+          </span>
+          <span class="mock-badge">Mocked v1</span>
+        </header>
 
-      <!-- Top tabs -->
-      <nav class="tabbar" aria-label="Sections">
-        <button class="tab active" data-tab="family" type="button">Family</button>
-        <button class="tab" data-tab="chapters" type="button">
-          Chapters<span class="tab-count" id="chaptersCount" hidden>0</span>
-        </button>
-        <button class="tab" data-tab="records" type="button">Record</button>
-        <button class="tab" data-tab="parking" type="button">
-          Parking<span class="tab-count" id="parkingCount" hidden>0</span>
-        </button>
-        <button class="tab" data-tab="settings" type="button">Settings</button>
-      </nav>
+        <nav class="tabbar" aria-label="Sections">
+          <button class="tab active" data-tab="family" type="button">Family</button>
+          <button class="tab" data-tab="chapters" type="button">
+            Chapters<span class="tab-count" id="chaptersCount" hidden>0</span>
+          </button>
+          <button class="tab" data-tab="records" type="button">Record</button>
+          <button class="tab" data-tab="parking" type="button">
+            Parking<span class="tab-count" id="parkingCount" hidden>0</span>
+          </button>
+          <button class="tab" data-tab="settings" type="button">Settings</button>
+        </nav>
+      </div>
 
       <div class="views" aria-live="polite">
 
@@ -143,13 +144,22 @@
               <h2>Capture the conversation</h2>
             </div>
 
+            <div class="recording-with" id="recordingWith" hidden>
+              <span class="recording-with-avatar" id="recordingWithAvatar"></span>
+              <span>Recording with <strong id="recordingWithName"></strong></span>
+            </div>
+
             <div class="recording-surface">
               <div class="pulse" aria-hidden="true"></div>
               <output class="timer" id="timer">00:00</output>
-              <button class="stop-button" id="stopButton" type="button">
-                <span class="stop-icon" aria-hidden="true"></span>
-                Stop recording
-              </button>
+              <div class="recording-actions">
+                <button class="ghost-button" id="pauseButton" type="button">Pause</button>
+                <button class="stop-button" id="stopButton" type="button">
+                  <span class="stop-icon" aria-hidden="true"></span>
+                  Stop recording
+                </button>
+              </div>
+              <button class="cancel-link" id="cancelButton" type="button">Cancel recording</button>
               <p class="recording-status" id="recordingStatus" hidden></p>
             </div>
             <div class="topic-hint" id="topicHint" hidden>
