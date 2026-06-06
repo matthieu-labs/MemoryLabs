@@ -1,0 +1,21 @@
+# Netlify deployment config.
+#
+# Static site (no bundler) served from the repo root. A tiny build step writes
+# config.js from environment variables so Supabase works on the live site
+# without committing keys. Serverless functions proxy the AI APIs so judges can
+# use the app without supplying their own ElevenLabs / Qwen keys.
+#
+# Set these in Netlify → Site settings → Environment variables:
+#   SUPABASE_URL, SUPABASE_ANON_KEY  (public, used by the browser)
+#   ELEVENLABS_API_KEY, QWEN_API_KEY (secret, used only by the functions)
+
+[build]
+  command = "node scripts/gen-config.js"
+  publish = "."
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "18"
+
+[functions]
+  node_bundler = "esbuild"

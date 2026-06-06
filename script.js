@@ -478,8 +478,8 @@ async function startRecording() {
     return;
   }
 
-  // Real recording needs an ElevenLabs key for transcription.
-  if (!getApiKey()) {
+  // Real recording needs an ElevenLabs key (typed-in or hosted) for transcription.
+  if (!elevenAvailable()) {
     setUploadStatus("Enter your ElevenLabs API key before recording (or enable Debug mode).", true);
     el.apiKey.focus();
     return;
@@ -551,7 +551,7 @@ async function handleRecordingStopped() {
   const file = new File([blob], `recording.${ext}`, { type: mimeType });
 
   try {
-    const data = await transcribeAudioFile(file, getApiKey());
+    const data = await transcribeAudioFile(file);
     if (applyDiarizedResult(data)) {
       setScreen("topics");
     } else {
@@ -1084,10 +1084,41 @@ function transcriptText() {
   return activeTranscript.map((line) => `${speakerName(line.speaker)}: ${line.text}`).join("\n");
 }
 
+// True when the app is served over http(s) (e.g. deployed on Netlify), where
+// the serverless function proxies with built-in keys are reachable. On file://
+// there is no backend, so a typed-in key is required.
+function hostedKeysAvailable() {
+  return location.protocol === "http:" || location.protocol === "https:";
+}
+
+function qwenAvailable() {
+  return !!getQwenKey() || hostedKeysAvailable();
+}
+
+function elevenAvailable() {
+  return !!getApiKey() || hostedKeysAvailable();
+}
+
 // Minimal Qwen chat-completions call; returns the assistant's text content.
+// Uses a typed-in key if present, otherwise the hosted Netlify Function proxy.
 async function qwenChat(messages, { temperature = 0.7 } = {}) {
   const key = getQwenKey();
-  if (!key) throw new Error("No Qwen API key");
+
+  if (!key) {
+    if (!hostedKeysAvailable()) throw new Error("No Qwen API key");
+    const proxied = await fetch("/.netlify/functions/qwen", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages, temperature, model: QWEN_MODEL }),
+    });
+    if (!proxied.ok) {
+      let detail = "";
+      try { detail = (await proxied.json())?.error || ""; } catch { /* ignore */ }
+      throw new Error(`Qwen proxy ${proxied.status}${detail ? ` — ${detail}` : ""}`);
+    }
+    const proxyData = await proxied.json();
+    return proxyData?.choices?.[0]?.message?.content || "";
+  }
 
   const response = await fetch(QWEN_URL, {
     method: "POST",
@@ -1112,7 +1143,28 @@ async function qwenChat(messages, { temperature = 0.7 } = {}) {
 
 // ─── ElevenLabs Scribe v2 transcription ───────────────────
 
-async function transcribeAudioFile(file, apiKey) {
+async function transcribeAudioFile(file) {
+  const key = getApiKey();
+
+  // No typed-in key → use the hosted Netlify Function proxy (server-side key).
+  if (!key) {
+    if (!hostedKeysAvailable()) throw new Error("No ElevenLabs API key");
+    const proxied = await fetch("/.netlify/functions/transcribe", {
+      method: "POST",
+      headers: {
+        "Content-Type": file.type || "application/octet-stream",
+        "X-Filename": file.name || "audio",
+      },
+      body: file,
+    });
+    if (!proxied.ok) {
+      let detail = "";
+      try { detail = (await proxied.json())?.error || ""; } catch { /* ignore */ }
+      throw new Error(`Transcription proxy ${proxied.status}${detail ? ` — ${detail}` : ""}`);
+    }
+    return proxied.json();
+  }
+
   const form = new FormData();
   form.append("file", file);
   form.append("model_id", "scribe_v2");
@@ -1121,7 +1173,7 @@ async function transcribeAudioFile(file, apiKey) {
 
   const response = await fetch(ELEVEN_STT_URL, {
     method: "POST",
-    headers: { "xi-api-key": apiKey },
+    headers: { "xi-api-key": key },
     body: form,
   });
 
@@ -1301,8 +1353,7 @@ async function handleAudioUpload(event) {
     return;
   }
 
-  const apiKey = getApiKey();
-  if (!apiKey) {
+  if (!elevenAvailable()) {
     setUploadStatus("Enter your ElevenLabs API key first.", true);
     el.apiKey.focus();
     event.target.value = "";
@@ -1311,7 +1362,7 @@ async function handleAudioUpload(event) {
 
   setUploadStatus(`Transcribing "${file.name}" with Scribe v2…`);
   try {
-    const data = await transcribeAudioFile(file, apiKey);
+    const data = await transcribeAudioFile(file);
     if (applyDiarizedResult(data)) {
       setUploadStatus(`Done — ${activeTranscript.length} segments.`);
       setScreen("topics");

@@ -12,6 +12,8 @@ claud_doc_uuid: 637d64aa-2662-4410-a4cc-da0289dc87e3
 - Qwen (DashScope, `qwen3.6-max-preview`) for theme-level topic detection and memoir chapter ghostwriting (with generated title); local keyword detection and raw-transcript fallbacks when no Qwen key.
 - Qwen-powered "Polish" of the chapter draft (replaces the previous mock polish note).
 - Supabase persistence (via CDN client + `config.js`): recordings/transcripts, approved chapters, and parking-lot topics are saved and reloaded on startup. Sidebar Recordings panel lists stored sessions and reopens them. Schema in `supabase-schema.sql`.
+- Visible storage status check on the start screen (connected / error / pending) with hints (e.g. run the schema) and per-save confirmations.
+- Netlify deployment: `netlify.toml`, serverless proxies (`netlify/functions/transcribe`, `netlify/functions/qwen`) that keep ElevenLabs/Qwen keys server-side so the hosted app works without user keys, and a build step (`scripts/gen-config.js`) that writes `config.js` from env vars. AI calls use a typed-in key if present, else the hosted proxy.
 - Debug mode: load a transcript file (`.md`/`.txt`) with no STT API call. Handles both `Speaker N` format and free-text Q&A interviews. Includes a hardcoded "Load example interview" sample for testing Qwen without ElevenLabs.
 ### Changed
 - Detected topics come from the transcript content (Qwen when available, else local keyword frequency) instead of a hardcoded dummy list.
