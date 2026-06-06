@@ -23,10 +23,10 @@
       <!-- Top tabs -->
       <nav class="tabbar" aria-label="Sections">
         <button class="tab active" data-tab="family" type="button">Family</button>
-        <button class="tab" data-tab="record" type="button">Record</button>
         <button class="tab" data-tab="chapters" type="button">
           Chapters<span class="tab-count" id="chaptersCount" hidden>0</span>
         </button>
+        <button class="tab" data-tab="records" type="button">Record</button>
         <button class="tab" data-tab="parking" type="button">
           Parking<span class="tab-count" id="parkingCount" hidden>0</span>
         </button>
@@ -250,6 +250,20 @@
 
         </section>
 
+        <!-- ─── Recordings list view (the "Record" tab) ──── -->
+        <section class="view" id="recordsView">
+          <div class="screen-heading">
+            <p class="eyebrow">Library</p>
+            <h2>Recordings</h2>
+          </div>
+          <div class="records-filter" id="recordsFilter" hidden>
+            <span class="records-filter-label">Stories with <strong id="recordsFilterName"></strong></span>
+            <button class="filter-clear" id="recordsFilterClear" type="button">Show all</button>
+          </div>
+          <p class="view-empty" id="recordsEmpty" hidden>No recordings yet. Tap the record button to start one.</p>
+          <ul class="records-list" id="recordsList"></ul>
+        </section>
+
         <!-- ─── Chapters view ─────────────────────────────── -->
         <section class="view" id="chaptersView">
           <div class="screen-heading">
@@ -281,6 +295,11 @@
         </section>
 
       </div>
+
+      <!-- Floating record button -->
+      <button class="fab" id="fab" type="button" aria-label="New recording">
+        <span class="fab-dot" aria-hidden="true"></span>
+      </button>
     </main>
 
     <!-- Modal -->

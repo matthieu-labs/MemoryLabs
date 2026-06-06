@@ -1,22 +1,33 @@
 :root {
-  /* Palette ported from the ui-prototype editorial look (oxblood + gold). */
-  --paper: #f6f1e7;
-  --sheet: #fffdf9;
-  --ink: #211c16;
-  --muted: #7a7060;
-  --line: #e1d7c6;
-  --sage: #7c2f2a;       /* primary accent — now oxblood */
-  --sage-dark: #5d211d;
-  --clay: #9c4639;       /* warm secondary, toned toward oxblood */
-  --clay-dark: #5d211d;
-  --gold: #b08534;
-  --rec: #c43a2f;
-  --shadow: 0 4px 24px rgba(33, 28, 22, 0.1);
-  --radius: 14px;
-  /* Aliases so components ported verbatim from ui-prototype read cleanly. */
-  --oxblood: #7c2f2a;
-  --oxblood-d: #5d211d;
-  --serif: "Iowan Old Style", Georgia, "Times New Roman", serif;
+  /* MemoryLabs brand — red #CC2222 + black + white, Plus Jakarta Sans.
+     See brand-guidelines.html. Single accent (red); everything else
+     white / black / grays. */
+  --font: "Plus Jakarta Sans", -apple-system, system-ui, "Segoe UI", sans-serif;
+  --red: #CC2222;
+  --red-dark: #AA1A1A;     /* hover */
+  --red-tint: #FFF5F5;     /* callout / highlight bg */
+  --paper: #FAFAFA;
+  --sheet: #FFFFFF;        /* cards, panels */
+  --surface: #F5F5F5;      /* inputs, subtle panels */
+  --ink: #111111;          /* body text / headings (brand black) */
+  --muted: #666666;        /* secondary text */
+  --line: #E8E8E8;         /* borders, dividers */
+  --bg-gradient: linear-gradient(135deg, #FFF5F0 0%, #FFFFFF 55%);
+  --shadow: 0 6px 24px rgba(0, 0, 0, 0.06);
+  --radius: 12px;          /* cards / panels */
+  --radius-md: 8px;        /* buttons / inputs */
+  --radius-sm: 4px;        /* tags / badges */
+  /* Back-compat aliases: legacy names now resolve to the brand red, grays,
+     and sans font so existing components re-skin without renaming. */
+  --sage: var(--red);
+  --sage-dark: var(--red-dark);
+  --clay: var(--red);
+  --clay-dark: var(--red);   /* eyebrows → brand red section labels */
+  --gold: #999999;           /* small uppercase labels → label gray */
+  --rec: var(--red);
+  --oxblood: var(--red);
+  --oxblood-d: var(--red-dark);
+  --serif: var(--font);      /* no serif in the brand */
 }
 
 * { box-sizing: border-box; }
@@ -25,11 +36,9 @@ body {
   min-height: 100vh;
   margin: 0;
   color: var(--ink);
-  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  background:
-    linear-gradient(90deg, rgba(36, 32, 26, 0.035) 1px, transparent 1px) 0 0 / 28px 28px,
-    linear-gradient(180deg, rgba(36, 32, 26, 0.025) 1px, transparent 1px) 0 0 / 28px 28px,
-    var(--paper);
+  font-family: var(--font);
+  -webkit-font-smoothing: antialiased;
+  background: var(--bg-gradient) fixed, var(--paper);
 }
 
 button, input, textarea { font: inherit; }
@@ -38,8 +47,9 @@ textarea { cursor: text; }
 
 h1, h2, h3 {
   margin: 0;
-  font-family: var(--serif);
-  font-weight: 700;
+  font-family: var(--font);
+  font-weight: 800;
+  letter-spacing: -0.01em;
 }
 
 h2 { font-size: clamp(1.5rem, 2.8vw, 2.6rem); line-height: 1.05; }
@@ -67,33 +77,13 @@ p { line-height: 1.6; }
 }
 
 .brand {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 9px;
 }
-
-.logo-dot {
-  position: relative;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  border: 2px solid var(--oxblood);
-  flex-shrink: 0;
-}
-.logo-dot::after {
-  content: "";
-  position: absolute;
-  inset: 5px;
-  border-radius: 50%;
-  background: var(--oxblood);
-}
-
-.logo-text {
-  font-family: var(--serif);
-  font-weight: 600;
-  font-size: 1.1rem;
-  color: var(--ink);
-  letter-spacing: -0.01em;
+.brand img {
+  height: 26px;
+  width: auto;
+  display: block;
 }
 
 .mock-badge {
@@ -102,11 +92,11 @@ p { line-height: 1.6; }
   align-items: center;
   padding: 4px 9px;
   border-radius: 999px;
-  background: rgba(176, 133, 52, 0.14);
-  color: var(--gold);
+  background: var(--red-tint);
+  color: var(--red);
   font-size: 0.62rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -153,7 +143,7 @@ p { line-height: 1.6; }
   height: 18px;
   padding: 0 5px;
   border-radius: 999px;
-  background: rgba(124, 47, 42, 0.12);
+  background: rgba(204, 34, 34, 0.1);
   color: var(--oxblood);
   font-size: 0.66rem;
   font-weight: 800;
@@ -1278,7 +1268,7 @@ input:focus {
   padding: 22px 20px;
   border: 1px solid var(--oxblood);
   border-radius: var(--radius);
-  background: rgba(124, 47, 42, 0.05);
+  background: rgba(204, 34, 34, 0.04);
   margin-bottom: 6px;
 }
 
@@ -1360,7 +1350,7 @@ input:focus {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: rgba(124, 47, 42, 0.1);
+  background: rgba(204, 34, 34, 0.08);
   color: var(--oxblood);
   display: grid;
   place-items: center;
@@ -1387,9 +1377,9 @@ input:focus {
 
 /* People with no recordings yet get a soft "add a story" badge instead. */
 .rec-count.is-empty {
-  background: rgba(124, 47, 42, 0.08);
-  color: var(--oxblood);
-  border: 1px solid rgba(124, 47, 42, 0.2);
+  background: rgba(204, 34, 34, 0.08);
+  color: var(--red);
+  border: 1px solid rgba(204, 34, 34, 0.2);
 }
 
 .family-hint {
@@ -1398,4 +1388,95 @@ input:focus {
   font-size: 0.86rem;
   margin: 18px auto 0;
   max-width: 38ch;
+}
+
+/* ─── Floating record button ──────────────────────── */
+.fab {
+  position: fixed;
+  right: max(env(safe-area-inset-right), 20px);
+  bottom: max(env(safe-area-inset-bottom), 20px);
+  z-index: 30;
+  width: 60px;
+  height: 60px;
+  border: none;
+  border-radius: 50%;
+  background: var(--red);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 10px 28px rgba(204, 34, 34, 0.36);
+  transition: transform 0.12s, background 0.12s;
+}
+.fab:hover { background: var(--red-dark); }
+.fab:active { transform: scale(0.93); }
+.fab-dot { width: 22px; height: 22px; border-radius: 50%; background: #fff; }
+
+@media (min-width: 600px) {
+  .fab { right: max(calc((100vw - 560px) / 2 + 16px), 24px); }
+}
+
+/* ─── Recordings list ("Record" tab) ──────────────── */
+.records-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 16px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--red-tint);
+}
+.records-filter-label { font-size: 0.9rem; color: var(--ink); }
+.records-filter-label strong { font-weight: 700; }
+.filter-clear {
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: var(--red);
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.records-list {
+  display: grid;
+  gap: 9px;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.record-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--sheet);
+}
+.record-avatar {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: rgba(204, 34, 34, 0.08);
+  color: var(--red);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+.record-main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.record-title { font-weight: 700; font-size: 1rem; color: var(--ink); }
+.record-meta { font-size: 0.82rem; color: var(--muted); }
+.record-topic {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
 }

@@ -258,6 +258,7 @@ async function dbLoadAll() {
   if (!recordings.error && recordings.data) {
     storedRecordings = recordings.data;
     renderRecordings();
+    renderRecords();
   }
 }
 
@@ -327,7 +328,8 @@ function setScreen(stepId) {
 
 const viewMap = {
   family:   document.querySelector("#familyView"),
-  record:   document.querySelector("#recordView"),
+  record:   document.querySelector("#recordView"),    // recording flow (FAB-launched, no tab)
+  records:  document.querySelector("#recordsView"),    // "Record" tab — list of recordings
   chapters: document.querySelector("#chaptersView"),
   parking:  document.querySelector("#parkingView"),
   settings: document.querySelector("#settingsView"),
@@ -348,6 +350,12 @@ function switchTab(tabKey) {
 
 document.querySelectorAll(".tab").forEach(btn => {
   btn.addEventListener("click", () => switchTab(btn.dataset.tab));
+});
+
+// Floating record button → jump straight into a new recording (flow + modal).
+document.querySelector("#fab").addEventListener("click", () => {
+  switchTab("record");
+  showModal();
 });
 
 // ─── Family tree ─────────────────────────────────────────
@@ -392,7 +400,7 @@ function personChip(person) {
 
 function renderFamilyTree() {
   const owner = `
-    <div class="owner-card">
+    <div class="owner-card" data-person="${escapeAttr(familyOwner.name)}" role="button" tabindex="0">
       <span class="owner-avatar">${initial(familyOwner.name)}</span>
       <span class="owner-name">${escapeHtml(familyOwner.name)}</span>
       <span class="owner-meta">${escapeHtml(familyOwner.meta)}</span>
@@ -409,11 +417,120 @@ function renderFamilyTree() {
   el.familyTree.innerHTML = owner + groups;
 }
 
+// Tapping a person (chip or owner card) opens the Record tab filtered to that
+// person's recordings.
 el.familyTree.addEventListener("click", e => {
-  const chip = e.target.closest(".person-chip");
-  if (!chip) return;
-  // Prototype: tapping a person would open their stories. Kept inert for now.
+  const target = e.target.closest("[data-person]");
+  if (!target) return;
+  openPersonRecords(target.dataset.person);
 });
+
+// ─── Recordings list ("Record" tab) ──────────────────────
+// Combines real saved recordings (storedRecordings → openable) with seeded
+// per-person stories so the list demos the family-tree person filter. The
+// tree's rec-counts are mock; real recordings carry no person link yet.
+
+const storyPool = [
+  { topic: "School",    title: "The walk to school" },
+  { topic: "War",       title: "Winters during the war" },
+  { topic: "Love",      title: "How they met" },
+  { topic: "Work",      title: "The first job" },
+  { topic: "Family",    title: "Sunday dinners" },
+  { topic: "Travel",    title: "The honeymoon train" },
+  { topic: "Childhood", title: "Summers at the lake" },
+];
+
+function buildRecords() {
+  const out = [];
+  storedRecordings.forEach((r, i) => out.push({
+    person: familyOwner.name,
+    topic: "Session",
+    title: r.title || "Recording",
+    meta: r.created_at ? new Date(r.created_at).toLocaleDateString() : "Saved",
+    recIndex: i,
+  }));
+  const everyone = [familyOwner, ...familyGroups.flatMap(g => g.people)];
+  everyone.forEach(p => {
+    for (let i = 0; i < (p.recordings || 0); i++) {
+      const s = storyPool[(p.name.length + i) % storyPool.length];
+      out.push({ person: p.name, topic: s.topic, title: s.title, meta: `${9 + ((i * 7) % 23)} min` });
+    }
+  });
+  return out;
+}
+
+let recordsFilterPerson = null;
+
+const elRecords = {
+  list:        document.querySelector("#recordsList"),
+  empty:       document.querySelector("#recordsEmpty"),
+  filter:      document.querySelector("#recordsFilter"),
+  filterName:  document.querySelector("#recordsFilterName"),
+  filterClear: document.querySelector("#recordsFilterClear"),
+};
+
+function renderRecords() {
+  if (!elRecords.list) return;
+  const all = buildRecords();
+  const items = recordsFilterPerson
+    ? all.filter(r => r.person === recordsFilterPerson)
+    : all;
+
+  elRecords.filter.hidden = !recordsFilterPerson;
+  if (recordsFilterPerson) elRecords.filterName.textContent = recordsFilterPerson;
+
+  if (!items.length) {
+    elRecords.empty.hidden = false;
+    elRecords.list.hidden = true;
+    elRecords.list.innerHTML = "";
+    return;
+  }
+  elRecords.empty.hidden = true;
+  elRecords.list.hidden = false;
+  elRecords.list.innerHTML = items.map(r => `
+    <li class="record-card"${r.recIndex != null ? ` data-rec="${r.recIndex}"` : ""}>
+      <span class="record-avatar">${initial(r.person)}</span>
+      <span class="record-main">
+        <span class="record-title">${escapeHtml(r.title)}</span>
+        <span class="record-meta">${escapeHtml(r.person)} · ${escapeHtml(r.meta)}</span>
+      </span>
+      <span class="record-topic">${escapeHtml(r.topic)}</span>
+    </li>`
+  ).join("");
+}
+
+function openPersonRecords(name) {
+  recordsFilterPerson = name;
+  renderRecords();
+  switchTab("records");
+}
+
+function openStoredRecording(rec) {
+  activeTranscript = Array.isArray(rec.segments) ? rec.segments : [];
+  speakerNames = rec.speaker_names || {};
+  uploadedTranscriptText = rec.full_text || null;
+  if (!activeTranscript.length) return;
+  renderTranscript();
+  detectAndRenderTopics();
+  switchTab("record");
+  setScreen("topics");
+}
+
+if (elRecords.filterClear) {
+  elRecords.filterClear.addEventListener("click", () => {
+    recordsFilterPerson = null;
+    renderRecords();
+  });
+}
+
+if (elRecords.list) {
+  elRecords.list.addEventListener("click", e => {
+    const card = e.target.closest("[data-rec]");
+    if (!card) return;
+    const rec = storedRecordings[Number(card.dataset.rec)];
+    if (rec) openStoredRecording(rec);
+  });
+}
 
 // ─── Chapters list ────────────────────────────────────────
 
@@ -1547,6 +1664,7 @@ renderChaptersList();
 renderParkingList();
 renderFamilyTree();
 renderRecordings();
+renderRecords();
 dbHealthCheck();
 dbLoadAll();
 setScreen("start");
