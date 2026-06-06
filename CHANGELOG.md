@@ -6,10 +6,17 @@ claud_doc_uuid: 637d64aa-2662-4410-a4cc-da0289dc87e3
 
 ## [Unreleased]
 ### Added
+- Audio/video upload + transcription via ElevenLabs Scribe v2 with speaker diarization; ElevenLabs and Qwen API key fields (stored in localStorage).
+- Editable transcript with per-speaker renaming (rename applies to every line; lines are inline-editable).
+- Qwen (DashScope, `qwen3.6-max-preview`) for theme-level topic detection and memoir chapter ghostwriting (with generated title); local keyword detection and raw-transcript fallbacks when no Qwen key.
+- Debug mode: load a transcript file (`.md`/`.txt`) with no STT API call. Handles both `Speaker N` format and free-text Q&A interviews. Includes a hardcoded "Load example interview" sample for testing Qwen without ElevenLabs.
 ### Changed
+- Detected topics come from the transcript content (Qwen when available, else local keyword frequency) instead of a hardcoded dummy list.
+- "Write chapter" generates the draft with Qwen instead of inserting a mock draft.
 ### Fixed
 ### Removed
 ### Security
+- API keys live client-side (browser/localStorage); demo/hackathon only — proxy through a backend for production.
 
 ## [0.2.0] - 2026-06-06
 ### Added

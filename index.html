@@ -119,6 +119,53 @@
             </button>
             <p class="record-hint">Tap to start recording</p>
 
+            <div class="upload-divider"><span>or</span></div>
+
+            <div class="upload-block">
+              <div class="api-key-field">
+                <label for="apiKey">ElevenLabs API key</label>
+                <input
+                  id="apiKey"
+                  type="password"
+                  placeholder="sk_…"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+
+              <div class="api-key-field">
+                <label for="qwenKey">Qwen (DashScope) API key</label>
+                <input
+                  id="qwenKey"
+                  type="password"
+                  placeholder="sk-…"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+
+              <label class="upload-button" for="audioUpload">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+                  <path d="M8 11V2"/>
+                  <path d="M4.5 5.5L8 2l3.5 3.5"/>
+                  <path d="M2.5 11v2.5h11V11"/>
+                </svg>
+                <span id="uploadButtonText">Upload an audio file</span>
+              </label>
+              <input id="audioUpload" type="file" accept="audio/*,video/*" hidden />
+              <p class="upload-hint">ElevenLabs Scribe v2 transcribes &amp; diarizes; Qwen detects topics and writes the chapter. (Qwen key optional — falls back to local topic detection.)</p>
+
+              <label class="debug-toggle">
+                <input type="checkbox" id="debugMode" />
+                Debug mode — load a transcript file (.md/.txt), skip the STT API
+              </label>
+              <button class="ghost-button debug-example-btn" id="loadExample" type="button" hidden>
+                Load example interview (Qwen only)
+              </button>
+
+              <p class="upload-status" id="uploadStatus" hidden></p>
+            </div>
+
             <details class="question-details">
               <summary>Question ideas <span class="secondary-label">optional</span></summary>
               <ul class="question-list">
