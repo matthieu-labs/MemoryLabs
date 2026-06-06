@@ -56,6 +56,7 @@ let recordedChunks = [];
 let isRealRecording = false;
 let parkedTopics   = [];
 let approvedChapters = [];
+let storedRecordings = [];
 let activeSidebarPanel = "chapters";
 
 // Transcript source: mock conversation by default, or the diarized lines from
@@ -110,6 +111,10 @@ const el = {
   parkingCount:   document.querySelector("#parkingCount"),
   parkingEmpty:   document.querySelector("#parkingEmpty"),
   parkingList:    document.querySelector("#parkingList"),
+  recordingsEmpty: document.querySelector("#recordingsEmpty"),
+  recordingsList:  document.querySelector("#recordingsList"),
+  projectName:    document.querySelector("#projectName"),
+  storageStatus:  document.querySelector("#storageStatus"),
   // Family tree
   familyTree:       document.querySelector("#familyTree"),
 };
@@ -126,6 +131,158 @@ function escapeHtml(value) {
 
 function escapeAttr(value) {
   return String(value).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+}
+
+// ─── Supabase persistence ─────────────────────────────────
+// Data (recordings, chapters, parked topics) is stored in Supabase. The URL +
+// anon key come from config.js (window.MEMOIR_CONFIG). The anon key is meant to
+// be public; protect data with Row Level Security (see supabase-schema.sql).
+
+let supabaseConfigError = null;
+
+const SUPABASE = (() => {
+  const cfg = window.MEMOIR_CONFIG;
+  if (!window.supabase) {
+    supabaseConfigError = "Supabase library failed to load (check your internet connection).";
+  } else if (!cfg || !cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
+    supabaseConfigError = "config.js is missing SUPABASE_URL / SUPABASE_ANON_KEY.";
+  } else if (cfg.SUPABASE_URL.includes("YOUR-PROJECT")) {
+    supabaseConfigError = "config.js still has placeholder values — paste your real Supabase URL + key.";
+  } else if (!/^https:\/\//.test(cfg.SUPABASE_URL)) {
+    supabaseConfigError =
+      "SUPABASE_URL must be the REST URL (https://<project>.supabase.co), not the postgres:// connection string.";
+  }
+
+  if (supabaseConfigError) {
+    console.warn("Supabase not configured:", supabaseConfigError);
+    return null;
+  }
+  try {
+    return window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  } catch (error) {
+    supabaseConfigError = `Supabase init failed: ${error.message}`;
+    console.warn(supabaseConfigError);
+    return null;
+  }
+})();
+
+function setStorageStatus(message, state) {
+  if (!el.storageStatus) return;
+  el.storageStatus.hidden = false;
+  el.storageStatus.textContent = message;
+  el.storageStatus.dataset.state = state; // ok | error | pending
+}
+
+// Verify the client can actually reach the tables, and report it in the UI.
+async function dbHealthCheck() {
+  if (!SUPABASE) {
+    setStorageStatus(supabaseConfigError || "Storage off — fill config.js to save your work.", "error");
+    return;
+  }
+  setStorageStatus("Checking storage connection…", "pending");
+  const { error } = await SUPABASE.from("recordings").select("id").limit(1);
+  if (error) {
+    const hint = /relation .* does not exist|find the table/i.test(error.message)
+      ? " — run supabase-schema.sql in the SQL editor."
+      : "";
+    setStorageStatus(`Storage error: ${error.message}${hint}`, "error");
+  } else {
+    setStorageStatus("Storage connected — your work is saved automatically.", "ok");
+  }
+}
+
+function currentProject() {
+  return (el.projectName && el.projectName.value.trim()) || "Untitled project";
+}
+
+async function dbSaveChapter(title, text) {
+  if (!SUPABASE) return;
+  const { error } = await SUPABASE.from("chapters").insert({
+    project: currentProject(),
+    title,
+    body: text,
+  });
+  if (error) setStorageStatus(`Couldn't save chapter: ${error.message}`, "error");
+  else setStorageStatus("Chapter saved.", "ok");
+}
+
+async function dbSaveParkedTopic(text) {
+  if (!SUPABASE) return;
+  const { error } = await SUPABASE.from("parked_topics").insert({
+    project: currentProject(),
+    text,
+  });
+  if (error) setStorageStatus(`Couldn't save topic: ${error.message}`, "error");
+  else setStorageStatus("Topic parked & saved.", "ok");
+}
+
+async function dbSaveRecording(title) {
+  if (!SUPABASE) return;
+  const { data, error } = await SUPABASE.from("recordings")
+    .insert({
+      project: currentProject(),
+      title: title || `Recording — ${new Date().toLocaleString()}`,
+      full_text: uploadedTranscriptText || transcriptText(),
+      segments: activeTranscript,
+      speaker_names: speakerNames,
+    })
+    .select()
+    .single();
+  if (error) {
+    setStorageStatus(`Couldn't save recording: ${error.message}`, "error");
+    return;
+  }
+  if (data) {
+    storedRecordings.unshift(data);
+    renderRecordings();
+    setStorageStatus("Recording saved.", "ok");
+  }
+}
+
+async function dbLoadAll() {
+  if (!SUPABASE) return;
+  const [chapters, parked, recordings] = await Promise.all([
+    SUPABASE.from("chapters").select("*").order("created_at", { ascending: true }),
+    SUPABASE.from("parked_topics").select("*").order("created_at", { ascending: true }),
+    SUPABASE.from("recordings").select("*").order("created_at", { ascending: false }).limit(50),
+  ]);
+
+  if (!chapters.error && chapters.data) {
+    approvedChapters = chapters.data.map((r) => ({ title: r.title, text: r.body }));
+    renderChaptersList();
+  }
+  if (!parked.error && parked.data) {
+    parkedTopics = parked.data.map((r) => r.text);
+    renderParkingList();
+  }
+  if (!recordings.error && recordings.data) {
+    storedRecordings = recordings.data;
+    renderRecordings();
+  }
+}
+
+function renderRecordings() {
+  if (!el.recordingsList) return;
+  const count = storedRecordings.length;
+
+  if (count === 0) {
+    el.recordingsEmpty.hidden = false;
+    el.recordingsList.hidden = true;
+    return;
+  }
+  el.recordingsEmpty.hidden = true;
+  el.recordingsList.hidden = false;
+  el.recordingsList.innerHTML = storedRecordings
+    .map(
+      (r, i) => `
+    <li>
+      <button class="recording-open" type="button" data-rec="${i}">
+        <span class="recording-title">${escapeHtml(r.title || "Recording")}</span>
+        <span class="recording-date">${r.created_at ? new Date(r.created_at).toLocaleString() : ""}</span>
+      </button>
+    </li>`
+    )
+    .join("");
 }
 
 function speakerName(index) {
@@ -316,6 +473,7 @@ function addParkedTopic() {
   const text = el.noteInput.value.trim();
   if (!text) return;
   parkedTopics.push(text);
+  dbSaveParkedTopic(text);
   el.noteInput.value = "";
   renderParkingList();
 }
@@ -390,8 +548,8 @@ async function startRecording() {
     return;
   }
 
-  // Real recording needs an ElevenLabs key for transcription.
-  if (!getApiKey()) {
+  // Real recording needs an ElevenLabs key (typed-in or hosted) for transcription.
+  if (!elevenAvailable()) {
     setUploadStatus("Enter your ElevenLabs API key before recording (or enable Debug mode).", true);
     el.apiKey.focus();
     return;
@@ -463,7 +621,7 @@ async function handleRecordingStopped() {
   const file = new File([blob], `recording.${ext}`, { type: mimeType });
 
   try {
-    const data = await transcribeAudioFile(file, getApiKey());
+    const data = await transcribeAudioFile(file);
     if (applyDiarizedResult(data)) {
       setScreen("topics");
     } else {
@@ -649,13 +807,23 @@ async function detectTopicsWithQwen() {
     });
 }
 
-// Render local topics immediately, then upgrade with Qwen if a key is present.
+function setTopicActionsEnabled(enabled) {
+  if (el.writeAllButton) el.writeAllButton.disabled = !enabled;
+  if (el.writeSelectedButton) el.writeSelectedButton.disabled = !enabled;
+  if (el.topicChoiceHint) el.topicChoiceHint.hidden = !enabled;
+}
+
+// Compute local topics as a fallback, then refine with Qwen if a key is set.
+// While Qwen works, we only show a loading state (no preliminary topics) and
+// keep the write actions disabled so the user waits for the real result.
 function detectAndRenderTopics() {
   refreshDetectedTopics();
   if (!getQwenKey()) {
+    setTopicActionsEnabled(true);
     renderTopics();
     return;
   }
+  setTopicActionsEnabled(false);
   renderTopics({ refining: true });
   detectTopicsWithQwen()
     .then((topics) => {
@@ -666,7 +834,10 @@ function detectAndRenderTopics() {
       }
     })
     .catch((error) => console.warn("Qwen topic detection failed, using local topics:", error))
-    .finally(() => renderTopics());
+    .finally(() => {
+      setTopicActionsEnabled(true);
+      renderTopics();
+    });
 }
 
 function currentTopic() {
@@ -677,15 +848,23 @@ function currentTopic() {
 }
 
 function renderTopics({ refining = false } = {}) {
-  const refiningNote = refining ? `<p class="topic-refining">Refining topics with Qwen…</p>` : "";
-
-  if (!detectedTopics.length) {
-    el.topicOptions.innerHTML =
-      refiningNote || `<p class="topic-empty">No clear topics detected — you can still write a chapter.</p>`;
+  // While refining, show only the loading state — hold back the preliminary
+  // local topics so the user doesn't see (and act on) throwaway guesses.
+  if (refining) {
+    el.topicOptions.innerHTML = `
+      <div class="topic-refining">
+        <span class="topic-refining-spinner" aria-hidden="true"></span>
+        Refining topics…
+      </div>`;
     return;
   }
 
-  const buttons = detectedTopics
+  if (!detectedTopics.length) {
+    el.topicOptions.innerHTML = `<p class="topic-empty">No clear topics detected — you can still write a chapter.</p>`;
+    return;
+  }
+
+  el.topicOptions.innerHTML = detectedTopics
     .map(
       (t) => `
     <button class="topic-button ${selectedTopics.has(t.id) ? "active" : ""}" type="button" data-topic="${escapeAttr(t.id)}" aria-pressed="${selectedTopics.has(t.id)}">
@@ -694,8 +873,6 @@ function renderTopics({ refining = false } = {}) {
     </button>`
     )
     .join("");
-
-  el.topicOptions.innerHTML = refiningNote + buttons;
 }
 
 function toggleTopic(topicId) {
@@ -872,6 +1049,7 @@ function approveChapter() {
   el.finalText.textContent  = text;
 
   approvedChapters.push({ title, text });
+  dbSaveChapter(title, text);
   renderChaptersList();
   switchSidebarPanel("chapters");
   setScreen("final");
@@ -915,6 +1093,9 @@ function resetDemo() {
   hideModal();
   switchSidebarPanel("chapters");
   setScreen("start");
+
+  // Restore persisted chapters / parking / recordings from Supabase.
+  dbLoadAll();
 }
 
 // ─── API config + helpers ─────────────────────────────────
@@ -973,10 +1154,41 @@ function transcriptText() {
   return activeTranscript.map((line) => `${speakerName(line.speaker)}: ${line.text}`).join("\n");
 }
 
+// True when the app is served over http(s) (e.g. deployed on Netlify), where
+// the serverless function proxies with built-in keys are reachable. On file://
+// there is no backend, so a typed-in key is required.
+function hostedKeysAvailable() {
+  return location.protocol === "http:" || location.protocol === "https:";
+}
+
+function qwenAvailable() {
+  return !!getQwenKey() || hostedKeysAvailable();
+}
+
+function elevenAvailable() {
+  return !!getApiKey() || hostedKeysAvailable();
+}
+
 // Minimal Qwen chat-completions call; returns the assistant's text content.
+// Uses a typed-in key if present, otherwise the hosted Netlify Function proxy.
 async function qwenChat(messages, { temperature = 0.7 } = {}) {
   const key = getQwenKey();
-  if (!key) throw new Error("No Qwen API key");
+
+  if (!key) {
+    if (!hostedKeysAvailable()) throw new Error("No Qwen API key");
+    const proxied = await fetch("/.netlify/functions/qwen", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages, temperature, model: QWEN_MODEL }),
+    });
+    if (!proxied.ok) {
+      let detail = "";
+      try { detail = (await proxied.json())?.error || ""; } catch { /* ignore */ }
+      throw new Error(`Qwen proxy ${proxied.status}${detail ? ` — ${detail}` : ""}`);
+    }
+    const proxyData = await proxied.json();
+    return proxyData?.choices?.[0]?.message?.content || "";
+  }
 
   const response = await fetch(QWEN_URL, {
     method: "POST",
@@ -1001,7 +1213,28 @@ async function qwenChat(messages, { temperature = 0.7 } = {}) {
 
 // ─── ElevenLabs Scribe v2 transcription ───────────────────
 
-async function transcribeAudioFile(file, apiKey) {
+async function transcribeAudioFile(file) {
+  const key = getApiKey();
+
+  // No typed-in key → use the hosted Netlify Function proxy (server-side key).
+  if (!key) {
+    if (!hostedKeysAvailable()) throw new Error("No ElevenLabs API key");
+    const proxied = await fetch("/.netlify/functions/transcribe", {
+      method: "POST",
+      headers: {
+        "Content-Type": file.type || "application/octet-stream",
+        "X-Filename": file.name || "audio",
+      },
+      body: file,
+    });
+    if (!proxied.ok) {
+      let detail = "";
+      try { detail = (await proxied.json())?.error || ""; } catch { /* ignore */ }
+      throw new Error(`Transcription proxy ${proxied.status}${detail ? ` — ${detail}` : ""}`);
+    }
+    return proxied.json();
+  }
+
   const form = new FormData();
   form.append("file", file);
   form.append("model_id", "scribe_v2");
@@ -1010,7 +1243,7 @@ async function transcribeAudioFile(file, apiKey) {
 
   const response = await fetch(ELEVEN_STT_URL, {
     method: "POST",
-    headers: { "xi-api-key": apiKey },
+    headers: { "xi-api-key": key },
     body: form,
   });
 
@@ -1043,6 +1276,7 @@ function applyDiarizedResult(data) {
 
   renderTranscript();
   detectAndRenderTopics();
+  dbSaveRecording();
   return true;
 }
 
@@ -1189,8 +1423,7 @@ async function handleAudioUpload(event) {
     return;
   }
 
-  const apiKey = getApiKey();
-  if (!apiKey) {
+  if (!elevenAvailable()) {
     setUploadStatus("Enter your ElevenLabs API key first.", true);
     el.apiKey.focus();
     event.target.value = "";
@@ -1199,7 +1432,7 @@ async function handleAudioUpload(event) {
 
   setUploadStatus(`Transcribing "${file.name}" with Scribe v2…`);
   try {
-    const data = await transcribeAudioFile(file, apiKey);
+    const data = await transcribeAudioFile(file);
     if (applyDiarizedResult(data)) {
       setUploadStatus(`Done — ${activeTranscript.length} segments.`);
       setScreen("topics");
@@ -1290,10 +1523,30 @@ el.topicOptions.addEventListener("click", e => {
   if (btn) toggleTopic(btn.dataset.topic);
 });
 
+// Open a stored recording back into the transcript/topics view.
+if (el.recordingsList) {
+  el.recordingsList.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-rec]");
+    if (!btn) return;
+    const rec = storedRecordings[Number(btn.dataset.rec)];
+    if (!rec) return;
+    activeTranscript = Array.isArray(rec.segments) ? rec.segments : [];
+    speakerNames = rec.speaker_names || {};
+    uploadedTranscriptText = rec.full_text || null;
+    if (!activeTranscript.length) return;
+    renderTranscript();
+    detectAndRenderTopics();
+    setScreen("topics");
+  });
+}
+
 // ─── Init ─────────────────────────────────────────────────
 
 renderTopics();
 renderChaptersList();
 renderParkingList();
 renderFamilyTree();
+renderRecordings();
+dbHealthCheck();
+dbLoadAll();
 setScreen("start");

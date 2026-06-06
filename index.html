@@ -108,7 +108,7 @@
                   <span id="uploadButtonText">Upload an audio file</span>
                 </label>
                 <input id="audioUpload" type="file" accept="audio/*,video/*" hidden />
-                <p class="upload-hint">ElevenLabs Scribe v2 transcribes &amp; diarizes; Qwen detects topics and writes the chapter. (Qwen key optional — falls back to local topic detection.)</p>
+                <p class="upload-hint">ElevenLabs Scribe v2 transcribes &amp; diarizes; Qwen detects topics and writes the chapter. On the hosted site you can leave both keys blank — it uses built-in server keys. Running locally? Paste your own keys above.</p>
 
                 <label class="debug-toggle">
                   <input type="checkbox" id="debugMode" />
@@ -119,7 +119,8 @@
                 </button>
 
                 <p class="upload-status" id="uploadStatus" hidden></p>
-              </div>
+              <p class="storage-status" id="storageStatus" hidden></p>
+            </div>
 
               <details class="question-details">
                 <summary>Question ideas <span class="secondary-label">optional</span></summary>
@@ -305,6 +306,8 @@
       </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="./config.js"></script>
     <script src="./script.js"></script>
   </body>
 </html>

@@ -8,3 +8,6 @@ Thumbs.db
 *.log
 node_modules/
 .claude
+
+# Local secrets / config
+config.js
