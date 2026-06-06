@@ -114,6 +114,7 @@ const el = {
   recordingsEmpty: document.querySelector("#recordingsEmpty"),
   recordingsList:  document.querySelector("#recordingsList"),
   projectName:    document.querySelector("#projectName"),
+  storageStatus:  document.querySelector("#storageStatus"),
   // Nav panels
   panelChapters:    document.querySelector("#panelChapters"),
   panelRecordings:  document.querySelector("#panelRecordings"),
@@ -140,19 +141,58 @@ function escapeAttr(value) {
 // anon key come from config.js (window.MEMOIR_CONFIG). The anon key is meant to
 // be public; protect data with Row Level Security (see supabase-schema.sql).
 
+let supabaseConfigError = null;
+
 const SUPABASE = (() => {
   const cfg = window.MEMOIR_CONFIG;
-  if (!window.supabase || !cfg || !cfg.SUPABASE_URL || cfg.SUPABASE_URL.includes("YOUR-PROJECT")) {
-    console.warn("Supabase not configured — data will not persist. Fill in config.js.");
+  if (!window.supabase) {
+    supabaseConfigError = "Supabase library failed to load (check your internet connection).";
+  } else if (!cfg || !cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY) {
+    supabaseConfigError = "config.js is missing SUPABASE_URL / SUPABASE_ANON_KEY.";
+  } else if (cfg.SUPABASE_URL.includes("YOUR-PROJECT")) {
+    supabaseConfigError = "config.js still has placeholder values — paste your real Supabase URL + key.";
+  } else if (!/^https:\/\//.test(cfg.SUPABASE_URL)) {
+    supabaseConfigError =
+      "SUPABASE_URL must be the REST URL (https://<project>.supabase.co), not the postgres:// connection string.";
+  }
+
+  if (supabaseConfigError) {
+    console.warn("Supabase not configured:", supabaseConfigError);
     return null;
   }
   try {
     return window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
   } catch (error) {
-    console.warn("Supabase init failed:", error);
+    supabaseConfigError = `Supabase init failed: ${error.message}`;
+    console.warn(supabaseConfigError);
     return null;
   }
 })();
+
+function setStorageStatus(message, state) {
+  if (!el.storageStatus) return;
+  el.storageStatus.hidden = false;
+  el.storageStatus.textContent = message;
+  el.storageStatus.dataset.state = state; // ok | error | pending
+}
+
+// Verify the client can actually reach the tables, and report it in the UI.
+async function dbHealthCheck() {
+  if (!SUPABASE) {
+    setStorageStatus(supabaseConfigError || "Storage off — fill config.js to save your work.", "error");
+    return;
+  }
+  setStorageStatus("Checking storage connection…", "pending");
+  const { error } = await SUPABASE.from("recordings").select("id").limit(1);
+  if (error) {
+    const hint = /relation .* does not exist|find the table/i.test(error.message)
+      ? " — run supabase-schema.sql in the SQL editor."
+      : "";
+    setStorageStatus(`Storage error: ${error.message}${hint}`, "error");
+  } else {
+    setStorageStatus("Storage connected — your work is saved automatically.", "ok");
+  }
+}
 
 function currentProject() {
   return (el.projectName && el.projectName.value.trim()) || "Untitled project";
@@ -165,7 +205,8 @@ async function dbSaveChapter(title, text) {
     title,
     body: text,
   });
-  if (error) console.warn("Supabase: save chapter failed", error.message);
+  if (error) setStorageStatus(`Couldn't save chapter: ${error.message}`, "error");
+  else setStorageStatus("Chapter saved.", "ok");
 }
 
 async function dbSaveParkedTopic(text) {
@@ -174,7 +215,8 @@ async function dbSaveParkedTopic(text) {
     project: currentProject(),
     text,
   });
-  if (error) console.warn("Supabase: save parked topic failed", error.message);
+  if (error) setStorageStatus(`Couldn't save topic: ${error.message}`, "error");
+  else setStorageStatus("Topic parked & saved.", "ok");
 }
 
 async function dbSaveRecording(title) {
@@ -190,12 +232,13 @@ async function dbSaveRecording(title) {
     .select()
     .single();
   if (error) {
-    console.warn("Supabase: save recording failed", error.message);
+    setStorageStatus(`Couldn't save recording: ${error.message}`, "error");
     return;
   }
   if (data) {
     storedRecordings.unshift(data);
     renderRecordings();
+    setStorageStatus("Recording saved.", "ok");
   }
 }
 
@@ -1382,5 +1425,6 @@ renderTopics();
 renderChaptersList();
 renderParkingList();
 renderRecordings();
+dbHealthCheck();
 dbLoadAll();
 setScreen("start");

@@ -684,6 +684,30 @@ input:focus {
   color: var(--clay-dark);
 }
 
+.storage-status {
+  margin: 8px 0 0;
+  padding-left: 16px;
+  position: relative;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.storage-status::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.storage-status[data-state="ok"] { color: var(--sage-dark); }
+.storage-status[data-state="error"] { color: var(--clay-dark); }
+.storage-status[data-state="pending"] { color: #9a8c6a; }
+
 .recording-status {
   margin: 12px 0 0;
   font-size: 0.9rem;
