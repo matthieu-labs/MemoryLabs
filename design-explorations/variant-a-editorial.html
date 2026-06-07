@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>A — Editorial Archive</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600&display=swap');
+
+  :root{
+    --paper:#f6f1e7;
+    --sheet:#fffdf9;
+    --ink:#211c16;
+    --muted:#7a7060;
+    --line:#e1d7c6;
+    --oxblood:#7c2f2a;
+    --oxblood-d:#5d211d;
+    --gold:#b08534;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:980px;margin:0 auto;padding:0 28px;}
+  .serif{font-family:'Fraunces',Georgia,serif;}
+  .eyebrow{font-size:.7rem;font-weight:600;letter-spacing:.22em;text-transform:uppercase;color:var(--oxblood);}
+
+  /* Top bar */
+  .topbar{border-bottom:1px solid var(--line);}
+  .topbar .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;}
+  .brand{font-family:'Fraunces',serif;font-weight:600;font-size:1.15rem;letter-spacing:-.01em;display:flex;align-items:center;gap:10px;}
+  .brand .mark{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--oxblood);position:relative;}
+  .brand .mark::after{content:"";position:absolute;inset:6px;border-radius:50%;background:var(--oxblood);}
+  .topnav{display:flex;gap:30px;font-size:.82rem;color:var(--muted);font-weight:500;}
+  .topnav a{color:inherit;text-decoration:none;}
+  .topnav a.on{color:var(--ink);}
+
+  /* Stepper */
+  .steps{display:flex;gap:0;justify-content:center;padding:34px 0 6px;}
+  .steps span{font-size:.72rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);opacity:.55;display:flex;align-items:center;}
+  .steps span.on{color:var(--oxblood);opacity:1;font-weight:600;}
+  .steps span:not(:last-child)::after{content:"";width:46px;height:1px;background:var(--line);margin:0 16px;}
+
+  .section-label{text-align:center;padding:60px 0 0;}
+
+  /* START */
+  .hero{text-align:center;padding:18px 0 90px;}
+  .hero h1{font-size:clamp(2.4rem,5.4vw,3.7rem);font-weight:500;line-height:1.04;margin:14px auto 10px;max-width:14ch;letter-spacing:-.015em;}
+  .hero .sub{color:var(--muted);font-size:1.02rem;max-width:42ch;margin:0 auto 40px;line-height:1.6;}
+  .field{max-width:420px;margin:0 auto 34px;text-align:left;}
+  .field label{display:block;font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-bottom:8px;font-weight:600;}
+  .field input{width:100%;height:54px;padding:0 18px;border:1px solid var(--line);border-radius:2px;background:var(--sheet);
+    font-family:'Fraunces',serif;font-size:1.2rem;color:var(--ink);}
+  .field input:focus{outline:none;border-color:var(--oxblood);}
+  .rec{display:inline-flex;align-items:center;gap:14px;background:var(--oxblood);color:#fff;border:none;
+    height:60px;padding:0 36px;border-radius:2px;font-size:1rem;font-weight:600;letter-spacing:.01em;cursor:pointer;
+    box-shadow:0 10px 30px rgba(124,47,42,.22);transition:.15s;}
+  .rec:hover{background:var(--oxblood-d);transform:translateY(-1px);}
+  .rec .dot{width:13px;height:13px;border-radius:50%;background:#fff;}
+  .hint{margin:18px 0 0;color:var(--muted);font-size:.82rem;}
+  .qs{max-width:420px;margin:46px auto 0;border-top:1px solid var(--line);padding-top:22px;text-align:left;}
+  .qs h4{font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 14px;font-weight:600;}
+  .qs li{font-family:'Fraunces',serif;font-size:1.02rem;color:var(--ink);padding:9px 0;border-bottom:1px solid var(--line);list-style:none;}
+  .qs ul{margin:0;padding:0;}
+
+  .divider{height:1px;background:var(--line);margin:0;}
+
+  /* CHAPTER */
+  .chap{padding:64px 0 90px;}
+  .chap-head{text-align:center;margin-bottom:46px;}
+  .chap-head .num{font-size:.72rem;letter-spacing:.2em;text-transform:uppercase;color:var(--gold);font-weight:600;}
+  .chap-head h2{font-family:'Fraunces',serif;font-weight:500;font-size:clamp(2.2rem,5vw,3.3rem);line-height:1.05;margin:14px auto 0;max-width:16ch;letter-spacing:-.015em;}
+  .chap-head .meta{color:var(--muted);font-size:.85rem;margin-top:16px;}
+  .prose{max-width:620px;margin:0 auto;}
+  .prose .drop::first-letter{font-family:'Fraunces',serif;font-size:3.4rem;float:left;line-height:.8;padding:6px 12px 0 0;color:var(--oxblood);}
+  .prose p{font-family:'Fraunces',serif;font-size:1.24rem;line-height:1.85;color:#2c261e;margin:0 0 1.5em;}
+  .actions{max-width:620px;margin:40px auto 0;display:flex;gap:12px;justify-content:center;border-top:1px solid var(--line);padding-top:30px;}
+  .btn{height:48px;padding:0 24px;border-radius:2px;font-weight:600;font-size:.9rem;cursor:pointer;border:1px solid var(--line);background:var(--sheet);color:var(--ink);}
+  .btn.primary{background:var(--oxblood);border-color:var(--oxblood);color:#fff;}
+  .note{text-align:center;color:var(--muted);font-size:.75rem;letter-spacing:.04em;padding:40px 0;}
+</style>
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="wrap">
+      <div class="brand"><span class="mark"></span> Memoir</div>
+      <nav class="topnav">
+        <a class="on">Chapters</a><a>Recordings</a><a>Parking lot</a><a>Settings</a>
+      </nav>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <!-- STEPPER -->
+    <div class="steps">
+      <span class="on">Start</span><span>Record</span><span>Transcript</span><span>Review</span><span>Chapter</span>
+    </div>
+
+    <!-- START SCREEN -->
+    <section class="hero">
+      <p class="eyebrow">A new memoir</p>
+      <h1 class="serif">Every life deserves to be written down.</h1>
+      <p class="sub">Record a conversation. We'll turn it into a chapter — in their own voice, kept for the people who come after.</p>
+
+      <div class="field">
+        <label>Project name</label>
+        <input value="Grandpa's Memoirs" />
+      </div>
+
+      <button class="rec"><span class="dot"></span> Start recording</button>
+      <p class="hint">Set the phone down. Just talk.</p>
+
+      <div class="qs">
+        <h4>A few things you might ask</h4>
+        <ul>
+          <li>What did a normal school morning look like?</li>
+          <li>Who was your favourite teacher, and why?</li>
+          <li>Which memory still makes you laugh today?</li>
+        </ul>
+      </div>
+    </section>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- CHAPTER SCREEN -->
+  <div class="wrap">
+    <section class="chap">
+      <div class="chap-head">
+        <p class="num">Chapter One · School</p>
+        <h2>The Walk to School</h2>
+        <p class="meta">In Grandpa's voice · from a 12-minute conversation</p>
+      </div>
+      <article class="prose">
+        <p class="drop">The walk to school felt longer in those days, though it could not have been more than twenty minutes. I remember the sound of my shoes on the pavement and the way I tried to arrive with my hair still combed, even when the wind had other plans.</p>
+        <p>Our classroom had wooden desks with small scratches from generations before us. There was a blue ink bottle near the teacher's table, and somehow that bottle made the whole room feel serious. We were expected to sit straight, listen carefully, and not waste words.</p>
+        <p>Still, school was not only strictness. It was the place where I learned who could make me laugh without moving their mouth, who would share a pencil, and who was brave enough to ask a question when the rest of us were pretending to understand.</p>
+      </article>
+      <div class="actions">
+        <button class="btn">Edit text</button>
+        <button class="btn">Adjust voice & tone</button>
+        <button class="btn primary">Approve chapter</button>
+      </div>
+    </section>
+  </div>
+
+  <p class="note">DIRECTION A — EDITORIAL ARCHIVE · timeless, publisher-grade, premium</p>
+
+</body>
+</html>

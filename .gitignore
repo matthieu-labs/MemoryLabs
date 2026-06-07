@@ -1,12 +1,19 @@
 # macOS
 .DS_Store
 __MACOSX/
-.idea
 
 # Editor / OS
 Thumbs.db
 *.log
 node_modules/
 
-# Local secrets / config
-config.js
+# Next.js
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# Env
+.env
+.env.local
+.env*.local

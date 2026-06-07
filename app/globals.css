@@ -1,0 +1,531 @@
+/* ===================================================================
+   Design tokens
+   Single source of truth for color, radius, spacing, type and motion.
+   Raw palette is stored as RGB triplets so any hue can be reused at an
+   arbitrary alpha via rgb(var(--x-rgb) / a) without redefining the hue.
+   =================================================================== */
+:root {
+  /* ── Raw palette (space-separated RGB triplets, for rgb(... / a)) ── */
+  --paper-rgb: 246 241 231;
+  --ink-rgb: 33 28 22;
+  --oxblood-rgb: 124 47 42;
+  --gold-rgb: 176 133 52;
+  --rec-rgb: 196 58 47;
+  --pine-rgb: 63 102 89;
+
+  /* ── Semantic colors ── */
+  --paper: rgb(var(--paper-rgb));
+  --sheet: #fffdf9;
+  --white: #fff;
+  --ink: rgb(var(--ink-rgb));
+  --ink-soft: #2c261e;          /* long-form prose body */
+  --muted: #7a7060;
+  --line: #e1d7c6;
+  --oxblood: rgb(var(--oxblood-rgb));
+  --oxblood-d: #5d211d;
+  --gold: rgb(var(--gold-rgb));
+  --gold-d: #6b5320;            /* readable gold text on light bg */
+  --rec: rgb(var(--rec-rgb));
+  --pine: rgb(var(--pine-rgb));
+  --pine-d: #2c5346;
+  --tint-press: rgba(0, 0, 0, .04);
+
+  /* ── Radii ── */
+  --radius: 14px;               /* base — cards, inputs, buttons */
+  --radius-sm: 10px;            /* banners, small controls */
+  --radius-pill: 999px;
+  --radius-circle: 50%;
+
+  /* ── Shadows ── */
+  --shadow-rec: 0 12px 34px rgb(var(--rec-rgb) / .32);
+  --shadow-fab: 0 10px 28px rgb(var(--oxblood-rgb) / .34);
+
+  /* ── Typography ── */
+  --serif: "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* ── Label / eyebrow micro-type (parameterized; variants tune these) ── */
+  --label-size: .66rem;
+  --label-weight: 700;
+  --label-tracking: .12em;
+  --label-color: var(--muted);
+
+  /* ── Sizing ── */
+  --app-width: 640px;
+  --app-pad-x: 20px;
+  --control-h: 52px;            /* inputs + full-height buttons */
+  --control-h-sm: 44px;         /* compact controls */
+  --fab-size: 60px;
+  --bp-wide: 700px;             /* (reference) wide-screen breakpoint */
+
+  /* ── Motion ── */
+  --t-press: .08s;
+  --t-fast: .12s;
+  --t-mid: .15s;
+  --t-screen: .26s;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; padding: 0; }
+
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  min-height: 100dvh;
+}
+
+button { font: inherit; cursor: pointer; }
+input, textarea { font: inherit; }
+
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; margin: 0; line-height: 1.08; }
+
+/* ===================================================================
+   Shared primitives — declaration blocks reused across components.
+   =================================================================== */
+
+/* Surface: paper sheet + hairline border (inputs, cards, pills, chips). */
+.input, .card, .prompt-list li, .person-chip, .topic-pill,
+.assign select, details.transcript summary {
+  background: var(--sheet);
+  border: 1px solid var(--line);
+}
+
+/* Centered icon/avatar containers. */
+.icon-btn, .record-btn, .fab, .owner-avatar, .person-avatar {
+  display: grid;
+  place-items: center;
+}
+
+/* Label / eyebrow micro-type. Each variant overrides the --label-* tokens. */
+.eyebrow, .field label, .chapter-num, .card-eyebrow,
+.relation-label, .suggest-label, .assign, .tspk {
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+  color: var(--label-color);
+}
+
+/* Count badge: white number on oxblood pill. */
+.rec-count, .owner-count {
+  background: var(--oxblood);
+  color: var(--white);
+  border-radius: var(--radius-pill);
+  font-weight: 800;
+}
+
+/* Tap feedback shared by tappable surfaces. */
+.card, .person-chip { transition: border-color var(--t-fast), transform var(--t-press); }
+.card:active, .person-chip:active { border-color: var(--oxblood); }
+
+/* ===================================================================
+   App frame — mobile-first single column.
+   =================================================================== */
+.app {
+  max-width: var(--app-width);
+  margin: 0 auto;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: max(env(safe-area-inset-top), 18px) var(--app-pad-x)
+           max(env(safe-area-inset-bottom), 96px);
+}
+
+.appbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-bottom: 18px;
+}
+.appbar .mark {
+  width: 26px; height: 26px; border-radius: var(--radius-circle);
+  border: 2px solid var(--oxblood); position: relative; flex-shrink: 0;
+}
+.appbar .mark::after {
+  content: ""; position: absolute; inset: 5px;
+  border-radius: var(--radius-circle); background: var(--oxblood);
+}
+.appbar .name { font-family: var(--serif); font-weight: 600; font-size: 1.1rem; }
+.appbar .spacer { flex: 1; }
+.brand-btn {
+  display: flex; align-items: center; gap: 10px;
+  background: none; border: none; padding: 0; color: var(--ink);
+}
+.icon-btn {
+  width: 38px; height: 38px; margin-left: 8px;
+  background: none; border: 1px solid var(--line); border-radius: var(--radius-sm); color: var(--ink);
+}
+.icon-btn:active { background: var(--tint-press); }
+.mock-pill {
+  --label-size: .62rem; --label-weight: 800; --label-tracking: .06em; --label-color: var(--gold);
+  background: rgb(var(--gold-rgb) / .14);
+  padding: 4px 9px; border-radius: var(--radius-pill);
+}
+
+.eyebrow { --label-size: .68rem; --label-tracking: .18em; --label-color: var(--oxblood); margin: 0 0 8px; }
+.muted { color: var(--muted); }
+
+/* ===================================================================
+   Section tabs (Recordings / Articles) — compact pills in the app bar.
+   The family tree lives on the logo.
+   =================================================================== */
+.tabs { display: flex; gap: 6px; }
+.tab {
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  padding: 7px 12px;
+  background: var(--sheet); border: 1px solid var(--line); border-radius: var(--radius-pill);
+  color: var(--muted); font-weight: 700; font-size: .82rem;
+  transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
+}
+.tab svg { flex-shrink: 0; }
+.tab.on { background: var(--oxblood); border-color: var(--oxblood); color: var(--white); }
+
+/* Very narrow screens: icon-only tabs to keep the bar on one line. */
+@media (max-width: 400px) {
+  .tab span { display: none; }
+  .tab { padding: 8px; }
+}
+
+/* ===================================================================
+   Screen container.
+   =================================================================== */
+.screen {
+  flex: 1; display: flex; flex-direction: column;
+  animation: screen-in var(--t-screen) ease both;
+}
+.center { justify-content: center; align-items: center; text-align: center; }
+
+/* Opacity only — a transform here would make .screen a containing block
+   for the fixed .action-bar and break its full-width positioning. */
+@keyframes screen-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .screen { animation: none; }
+}
+
+/* ===================================================================
+   Start.
+   =================================================================== */
+.lead {
+  font-size: clamp(1.9rem, 7vw, 2.5rem); line-height: 1.05;
+  letter-spacing: -.01em; max-width: 15ch; margin: 0 auto 12px;
+}
+.sub { color: var(--muted); font-size: 1.02rem; line-height: 1.55; max-width: 32ch; margin: 0 auto; }
+
+.field { width: 100%; text-align: left; margin: 26px 0 0; }
+.field label { display: block; margin-bottom: 7px; }
+.input {
+  width: 100%; height: var(--control-h); padding: 0 16px;
+  border-radius: var(--radius); color: var(--ink);
+  font-family: var(--serif); font-size: 1.15rem;
+}
+.input:focus { outline: none; border-color: var(--oxblood); }
+
+.record-btn {
+  width: 92px; height: 92px; border-radius: var(--radius-circle); border: none; margin: 34px auto 0;
+  background: var(--rec); box-shadow: var(--shadow-rec);
+  transition: transform var(--t-fast), box-shadow var(--t-fast);
+}
+.record-btn:active { transform: scale(.94); }
+.record-btn .dot { width: 30px; height: 30px; border-radius: var(--radius-circle); background: var(--white); }
+.record-hint { margin: 16px 0 0; color: var(--muted); font-size: .9rem; }
+
+.upload-link {
+  display: inline-block; margin-top: 22px; color: var(--oxblood);
+  font-size: .9rem; font-weight: 600; text-decoration: underline; background: none; border: none;
+}
+.upload-link input { display: none; }
+
+/* ===================================================================
+   Recording.
+   =================================================================== */
+.pulse {
+  width: 78px; height: 78px; border-radius: var(--radius-circle);
+  background: var(--rec); position: relative; margin: 0 auto;
+}
+.pulse::after {
+  content: ""; position: absolute; inset: -14px; border: 2px solid rgb(var(--rec-rgb) / .3);
+  border-radius: inherit; animation: pulse 1.5s infinite;
+}
+@keyframes pulse { from { transform: scale(.85); opacity: 1; } to { transform: scale(1.45); opacity: 0; } }
+.timer {
+  font-variant-numeric: tabular-nums; font-weight: 800; letter-spacing: -.02em;
+  font-size: clamp(4rem, 22vh, 6rem); line-height: 1; margin: 30px 0;
+}
+.pulse.paused { background: var(--muted); }
+.pulse.paused::after { animation: none; }
+
+/* ===================================================================
+   Buttons — base + modifiers.
+   =================================================================== */
+.btn {
+  min-height: var(--control-h); width: 100%; border-radius: var(--radius); border: 1px solid transparent;
+  font-weight: 700; font-size: 1rem; padding: 0 20px;
+}
+.btn-primary { background: var(--oxblood); color: var(--white); }
+.btn-primary:active { background: var(--oxblood-d); }
+.btn-stop { background: var(--rec); color: var(--white); display: inline-flex; align-items: center; justify-content: center; gap: 10px; }
+.btn-stop .sq { width: 14px; height: 14px; background: var(--white); border-radius: 3px; }
+.btn-ghost { background: var(--sheet); color: var(--ink); border-color: var(--line); }
+.btn-row { display: flex; gap: 10px; }
+.btn-row .btn { width: auto; flex: 1; white-space: nowrap; padding: 0 14px; }
+
+/* ===================================================================
+   Processing.
+   =================================================================== */
+.spinner {
+  width: 46px; height: 46px; border-radius: var(--radius-circle); margin: 0 auto 22px;
+  border: 4px solid var(--line); border-top-color: var(--oxblood); animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.steps-mini { color: var(--muted); font-size: .92rem; line-height: 1.9; }
+.steps-mini .on { color: var(--ink); font-weight: 700; }
+
+/* ===================================================================
+   Result / chapter.
+   =================================================================== */
+.chapter-num { --label-size: .68rem; --label-tracking: .16em; --label-color: var(--gold); }
+.chapter-title { font-size: clamp(1.8rem, 7vw, 2.4rem); margin: 10px 0 14px; letter-spacing: -.01em; }
+.chapter-prose { font-family: var(--serif); font-size: 1.22rem; line-height: 1.78; color: var(--ink-soft); }
+.chapter-prose p { margin: 0 0 1.2em; }
+.chapter-prose p:first-child::first-letter {
+  font-size: 3rem; float: left; line-height: .82; padding: 6px 10px 0 0; color: var(--oxblood);
+}
+
+/* Recorded-from context line + inline voice-note player on a chapter. */
+.chapter-meta { color: var(--muted); font-size: .85rem; margin: 0 0 14px; }
+.audio-note {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 14px; margin: 0 0 22px;
+  background: var(--sheet); border: 1px solid var(--line); border-radius: var(--radius);
+}
+.audio-note-label {
+  font-size: var(--label-size); font-weight: 800; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--gold);
+}
+.audio-note-player { width: 100%; height: 38px; }
+
+/* Articles tab — chapters grouped per person. */
+.article-group { margin-bottom: 22px; }
+.article-group-label { text-align: left; margin-bottom: 10px; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 7px; margin: 18px 0 4px; }
+.chip {
+  font-size: .8rem; font-weight: 600; padding: 5px 11px; border-radius: var(--radius-pill);
+  background: rgb(var(--oxblood-rgb) / .08); color: var(--oxblood); border: 1px solid rgb(var(--oxblood-rgb) / .16);
+}
+.chip-add {
+  background: rgb(var(--pine-rgb) / .08); color: var(--pine-d);
+  border-color: rgb(var(--pine-rgb) / .25); cursor: pointer;
+}
+.chip-add:active { transform: scale(.96); }
+
+details.transcript { margin-top: 26px; border-top: 1px solid var(--line); padding-top: 16px; }
+/* When the voice-note player sits directly above it (article view), drop the
+   divider so they read as one block. */
+.audio-note + details.transcript { margin-top: 0; border-top: none; padding-top: 0; }
+details.transcript summary {
+  cursor: pointer; font-size: .7rem; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--ink); font-weight: 700; list-style: none;
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 9px 16px; border-radius: var(--radius-pill);
+  transition: background var(--t-fast), border-color var(--t-fast);
+}
+details.transcript summary:hover { border-color: var(--oxblood); color: var(--oxblood); }
+details.transcript summary::-webkit-details-marker { display: none; }
+details.transcript summary::after {
+  content: "›"; font-size: 1.1rem; line-height: 1; transform: rotate(90deg);
+  transition: transform var(--t-mid);
+}
+details.transcript[open] summary::after { transform: rotate(-90deg); }
+.tline { display: grid; grid-template-columns: 84px 1fr; gap: 10px; margin-top: 12px; }
+.tspk { --label-size: .62rem; --label-weight: 800; --label-tracking: .04em; --label-color: var(--oxblood); padding-top: 3px; }
+.tspk.subject { --label-color: var(--gold); }
+.ttext { font-family: var(--serif); font-size: 1rem; line-height: 1.5; }
+
+.section-gap { margin-top: 28px; }
+.divider-soft { height: 1px; background: var(--line); margin: 24px 0; }
+
+.banner {
+  background: rgb(var(--gold-rgb) / .12); border: 1px solid rgb(var(--gold-rgb) / .3);
+  color: var(--gold-d); border-radius: var(--radius-sm); padding: 10px 13px; font-size: .82rem; line-height: 1.4;
+  margin-bottom: 18px;
+}
+.error-banner {
+  background: rgb(var(--rec-rgb) / .1); border: 1px solid rgb(var(--rec-rgb) / .35); color: var(--oxblood-d);
+  border-radius: var(--radius-sm); padding: 10px 13px; font-size: .88rem; margin-top: 14px;
+}
+
+/* ===================================================================
+   Library / Project screens.
+   =================================================================== */
+.lead-sm { font-size: clamp(1.6rem, 6vw, 2rem); letter-spacing: -.01em; margin-bottom: 4px; }
+.serif { font-family: var(--serif); }
+
+.back-link, .card-eyebrow { display: inline-block; }
+.back-link {
+  background: none; border: none; color: var(--muted); font-weight: 600;
+  font-size: .9rem; padding: 0; margin-bottom: 14px;
+  align-self: flex-start; text-align: left;
+}
+.back-link:active { color: var(--ink); }
+
+.card-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+.card {
+  display: flex; align-items: center; gap: 12px; text-align: left;
+  border-radius: var(--radius); padding: 16px;
+}
+.card:active { transform: scale(.99); }
+.card-main { display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0; }
+.card-eyebrow { --label-size: .62rem; --label-weight: 800; --label-tracking: .1em; --label-color: var(--gold); }
+.card-title { font-weight: 700; font-size: 1.05rem; line-height: 1.25; }
+.card-title.serif { font-weight: 600; font-size: 1.15rem; }
+.card-sub { font-size: .82rem; color: var(--muted); }
+.card-chevron { color: var(--muted); font-size: 1.6rem; line-height: 1; flex-shrink: 0; }
+
+/* ===================================================================
+   Onboarding prompts.
+   =================================================================== */
+.prompt-list {
+  list-style: none; margin: 26px 0 0; padding: 0; max-width: 320px;
+  display: grid; gap: 10px; width: 100%;
+}
+.prompt-list li {
+  font-family: var(--serif); font-size: 1.02rem; color: var(--muted);
+  padding: 10px 14px; border-radius: var(--radius-sm); text-align: left;
+}
+
+/* ===================================================================
+   Family tree.
+   =================================================================== */
+.tree { margin-top: 22px; }
+.owner-card {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  width: 100%; padding: 20px; border: 1px solid var(--oxblood);
+  border-radius: var(--radius); background: rgb(var(--oxblood-rgb) / .05); margin-bottom: 6px;
+}
+.owner-avatar {
+  width: 52px; height: 52px; border-radius: var(--radius-circle); background: var(--oxblood);
+  color: var(--white); font-family: var(--serif);
+  font-size: 1.5rem; font-weight: 600; margin-bottom: 4px;
+}
+.owner-name { font-family: var(--serif); font-weight: 600; font-size: 1.3rem; }
+.owner-meta { font-size: .82rem; color: var(--muted); }
+
+/* vertical connector between owner and groups */
+.relation-group { position: relative; padding-top: 18px; }
+.relation-group::before {
+  content: ""; position: absolute; top: 0; left: 50%; width: 1px; height: 18px;
+  background: var(--line);
+}
+.relation-label {
+  --label-size: .64rem; --label-weight: 800; --label-tracking: .12em; --label-color: var(--gold);
+  display: block; margin-bottom: 10px; text-align: center;
+}
+.person-row {
+  display: flex; flex-wrap: wrap; gap: 9px; justify-content: center; margin-bottom: 6px;
+}
+.person-chip {
+  display: inline-flex; align-items: center; gap: 9px;
+  padding: 8px 14px 8px 8px; border-radius: var(--radius-pill);
+}
+.person-chip:active { transform: scale(.97); }
+.person-avatar {
+  width: 30px; height: 30px; border-radius: var(--radius-circle); background: rgb(var(--oxblood-rgb) / .1);
+  color: var(--oxblood); font-weight: 700;
+  font-size: .92rem; flex-shrink: 0;
+}
+.person-name { font-weight: 600; font-size: .95rem; }
+.rec-count {
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px;
+  padding: 0 5px; font-size: .68rem; margin-left: 2px;
+}
+.owner-count {
+  margin-top: 8px; display: inline-flex; align-items: center; height: 22px;
+  padding: 0 10px; font-size: .7rem; font-weight: 700;
+}
+
+/* ===================================================================
+   Topic filter (person profile).
+   =================================================================== */
+.topic-filter {
+  display: flex; flex-wrap: wrap; gap: 8px; margin-top: 18px;
+}
+.topic-pill {
+  padding: 7px 14px; border-radius: var(--radius-pill);
+  color: var(--muted); font-size: .85rem; font-weight: 700;
+  transition: border-color var(--t-fast), color var(--t-fast), background var(--t-fast);
+}
+.topic-pill.on {
+  border-color: var(--oxblood); color: var(--white); background: var(--oxblood);
+}
+
+/* ===================================================================
+   Recognized-names suggestion.
+   =================================================================== */
+.suggest { margin: 14px 0 4px; }
+.suggest-label {
+  --label-size: .64rem; --label-weight: 800; --label-tracking: .1em; --label-color: var(--gold);
+  display: block; margin-bottom: 8px;
+}
+
+/* ===================================================================
+   Fixed chapter action bar (tags + save + approve).
+   =================================================================== */
+.has-actionbar { padding-bottom: 170px; }
+.action-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 60;
+  background: rgb(var(--paper-rgb) / .96);
+  backdrop-filter: blur(8px);
+  border-top: 1px solid var(--line);
+}
+.action-bar-inner {
+  max-width: var(--app-width); margin: 0 auto;
+  padding: 12px var(--app-pad-x) max(env(safe-area-inset-bottom), 14px);
+}
+/* Reset the .chips in-content top margin; the bar's own padding handles it. */
+.action-tags { margin: 0 0 10px; max-height: 64px; overflow: hidden; }
+.action-bottom { display: flex; align-items: flex-end; gap: 10px; }
+.assign {
+  --label-size: .6rem; --label-weight: 800; --label-tracking: .08em;
+  display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0;
+}
+.assign select {
+  height: var(--control-h-sm); border-radius: var(--radius);
+  color: var(--ink); font-size: .95rem; font-weight: 600;
+  padding: 0 10px; text-transform: none; letter-spacing: 0;
+}
+.action-bottom .btn { width: auto; flex: 0 0 auto; min-height: var(--control-h-sm); }
+
+/* ===================================================================
+   Persistent "new recording" FAB.
+   =================================================================== */
+.fab {
+  position: fixed;
+  right: max(env(safe-area-inset-right), 18px);
+  bottom: max(env(safe-area-inset-bottom), 18px);
+  width: var(--fab-size);
+  height: var(--fab-size);
+  border: none;
+  border-radius: var(--radius-circle);
+  background: var(--oxblood);
+  box-shadow: var(--shadow-fab);
+  z-index: 50;
+  transition: transform var(--t-fast), background var(--t-fast);
+}
+.fab:active { transform: scale(.94); background: var(--oxblood-d); }
+.fab-dot { width: 22px; height: 22px; border-radius: var(--radius-circle); background: var(--white); }
+
+/* Keep the FAB pinned to the browser's right edge on wide screens. */
+@media (min-width: 700px) {
+  .app { padding-top: 40px; }
+  .fab {
+    right: max(env(safe-area-inset-right), 24px);
+  }
+}
