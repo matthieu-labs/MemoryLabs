@@ -24,11 +24,11 @@
         <nav class="tabbar" aria-label="Sections">
           <button class="tab active" data-tab="family" type="button">Family</button>
           <button class="tab" data-tab="chapters" type="button">
-            Chapters<span class="tab-count" id="chaptersCount" hidden>0</span>
+            Chapters<span class="badge badge-tab-count" id="chaptersCount" hidden>0</span>
           </button>
           <button class="tab" data-tab="records" type="button">Record</button>
           <button class="tab" data-tab="parking" type="button">
-            Parking<span class="tab-count" id="parkingCount" hidden>0</span>
+            Parking<span class="badge badge-tab-count" id="parkingCount" hidden>0</span>
           </button>
           <button class="tab" data-tab="settings" type="button">Settings</button>
         </nav>
@@ -140,13 +140,15 @@
           <!-- Recording Screen -->
           <section class="screen" id="recordingScreen">
             <div class="screen-heading">
+<!--
               <p class="eyebrow" id="recordingLabel">Recording</p>
+-->
               <h2>Capture the conversation</h2>
             </div>
 
             <div class="recording-with" id="recordingWith" hidden>
               <span class="recording-with-avatar" id="recordingWithAvatar"></span>
-              <span>Recording with <strong id="recordingWithName"></strong></span>
+              <span>Recording about <strong id="recordingWithName"></strong></span>
             </div>
 
             <div class="recording-surface">
@@ -184,7 +186,7 @@
                 <div class="transcript-body" id="transcriptBody"></div>
               </section>
 
-              <aside class="panel topics-aside">
+              <aside class="topics-aside">
                 <div class="section-header">
                   <span>Detected topics</span>
                 </div>

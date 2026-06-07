@@ -453,8 +453,8 @@ function initial(name) {
 
 function personChip(person) {
   const badge = person.recordings > 0
-    ? `<span class="rec-count">${person.recordings}</span>`
-    : `<span class="rec-count is-empty" title="No stories yet">+</span>`;
+    ? `<span class="badge rec-count">${person.recordings}</span>`
+    : `<span class="badge rec-count is-empty" title="No stories yet">+</span>`;
   return `
     <button class="person-chip" type="button" data-person="${escapeAttr(person.name)}">
       <span class="person-avatar">${initial(person.name)}</span>
@@ -477,7 +477,7 @@ function renderFamilyTree() {
       <span class="owner-avatar">${initial(familyOwner.name)}</span>
       <span class="owner-name">${escapeHtml(familyOwner.name)}</span>
       <span class="owner-meta">${escapeHtml(familyOwner.meta)}</span>
-      <span class="owner-count">${familyOwner.recordings} stories</span>
+      <span class="badge owner-count">${familyOwner.recordings} stories</span>
     </div>`;
 
   el.familyTree.innerHTML =
@@ -571,7 +571,7 @@ function renderRecords() {
         <span class="record-title">${escapeHtml(r.title)}</span>
         <span class="record-meta">${escapeHtml(r.person)} · ${escapeHtml(r.meta)}</span>
       </span>
-      <span class="record-topic">${escapeHtml(r.topic)}</span>
+      <span class="badge record-topic">${escapeHtml(r.topic)}</span>
     </li>`
   ).join("");
 }
